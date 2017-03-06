@@ -1,18 +1,14 @@
 #zsurf
 about:
 
-zsurf - zero surf
+zsurf - Zero Surf
 
-Absolutely minimal code to initialize QtWebKit1. This browser is intended for use on systems with limited memory such as Raspberry PI Zero. QtWebKit1 includes recent security patches from Apple and it is also single threaded which greatly reduces memory usage.
+Absolutely minimal code to initialize QtWebKit1 with a few required features. This browser is intended primarily for use on systems with limited memory. Zero Surf uses QtWebKit1 which includes recent security patches from Apple and is also single threaded which greatly reduces memory usage.
+
+This is not the browser's final form and much work needs to be done to compile Qt to reduce memory usage further. The browser includes a simple script which offers Vim key bindings and simple hits. Future versions will offer a variety of scripts including extremely feature rich options.
 
 No AdBlock:
-I recommend using Privoxy with EasyList.
-
-No GUI or Hot Keys:
-Intended to be used with a custom Javascript user interface which will be executed by the browser engine. The browser only exposes browser options to the script.js file.
-
-Security Considerations:
-The JavaScript interface needs to use something like WeakMaps to make all methods, variables, and classes private. Otherwise, a malicious script can gain control of your browser options. A secure implementation has not been developed yet. No default script has be included in order to hopefully promote security through obscurity.
+Future versions will offer a JavaScript based AdBlocker. I recommend using Privoxy with EasyList for the time being.
 
 compile and install: 
 
