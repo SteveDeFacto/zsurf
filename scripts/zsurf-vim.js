@@ -168,12 +168,12 @@ function execSelect(elem) {
         else location.href=elem.href;
 
     } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset" || tracking)) {
-		simulate(elem, 'dblclick');
+		simulate(elem, 'click');
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
         // TODO: toggle checkbox
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
-		simulate(elem, 'dblclick');
+		simulate(elem, 'click');
         elem.setSelectionRange(elem.value.length, elem.value.length);
     }
     removeHints();
@@ -282,8 +282,10 @@ function openUrl(url, newTab){
 
 function find(word, node)
 {
-	if (!node)
+	if (!node){
+		unhighlight();
 		node = document.body;
+	}
 
 	for (node=node.firstChild; node; node=node.nextSibling)
 	{
@@ -328,6 +330,28 @@ function find(word, node)
 		}
 	}
 }
+
+
+function unhighlight()
+{
+	for (var i = 0; i < highlights.length; i++)
+	{
+		
+		var the_text_node = highlights[i].firstChild;
+		var parent_node = highlights[i].parentNode;
+		if (highlights[i].parentNode)
+		{
+			highlights[i].parentNode.replaceChild(the_text_node, highlights[i]);
+			if (i == find_pointer) selectElementContents(the_text_node);
+			parent_node.normalize();
+			//normalize(parent_node);
+		}
+	}
+	highlights = [];
+	find_pointer = -1;
+}
+
+
 
 function findNext()
 {
@@ -418,6 +442,34 @@ function scrollToPosition(field)
 		field.scrollIntoView();
 	}
 }
+
+
+
+function textarea2pre(el)
+{		
+	if (el.nextSibling && el.nextSibling.id && el.nextSibling.id.match(/pre_/i))
+		var pre = el.nextsibling;
+	else
+		var pre = document.createElement("pre");
+	
+	var the_text = el.value; 
+	the_text = the_text.replace(/>/g,'&gt;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
+	pre.innerHTML = the_text;
+	
+	var completeStyle = "";
+
+	    completeStyle = window.getComputedStyle(el, null).cssText;
+		pre.style.cssText = completeStyle;
+	el.parentNode.insertBefore(pre, el.nextSibling);
+	el.onblur = function() { this.style.display = "none"; pre.style.display = "block"; };
+	el.onchange = function() { pre.innerHTML = el.value.replace(/>/g,'&gt;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); };
+	
+	el.style.display = "none";
+	pre.id = "pre_"+highlights.length;
+	
+	pre.onclick = function() {this.style.display = "none"; el.style.display = "block"; el.focus(); el.click()};
+}
+
 
 function getStyle(el,styleProp)
 {
@@ -571,7 +623,7 @@ function initKeyBind(e){
 			addKeyBind( 'n', function(){findNext();}, e );
 
 		} else{
-			addKeyBind( 'Esc', function(){unfocus();}, e );
+			addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
 		}
     }
 }

@@ -36,7 +36,7 @@ QString userAgent;
 QString homePage;
 long embed;
 
-// Extend QWebPage to set user agent.
+// Extend QWebView to break fullscreen on Esc.
 class ZWebView : public QWebView {
 
 public :
@@ -64,7 +64,7 @@ class ZWebPage : public QWebPage {
     }
 };
 
-// Function to load script.
+// Function to load javascripts.
 void loadScripts()
 {
     scriptList.clear();
@@ -82,7 +82,7 @@ void loadScripts()
     }
 }
 
-// Allow live reload of script.
+// Allow live reload of javascripts.
 void liveReload()
 {
     watcher = new QFileSystemWatcher();
@@ -227,6 +227,16 @@ ZWebView* openWindow(QString url, bool visible)
     {
         webView->show();
     }
+
+    // Work around for resize bug.
+    QTimer::singleShot(1000, application, [webView]()
+    {
+        int width = webView->width();
+        int height = webView->height();
+        webView->resize(1, 1);
+        webView->resize(width, height);
+    });
+
 
     return webView;
 }

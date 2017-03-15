@@ -12,7 +12,7 @@ CONFIG += release
 SOURCES = zsurf.cpp
 
 !mac:unix{
-	binary.path += /bin/
+	binary.path += /usr/bin/
 	binary.files += zsurf
 	INSTALLS += binary
 
@@ -20,7 +20,7 @@ SOURCES = zsurf.cpp
 	desktop.files += zsurf.desktop
 	INSTALLS += desktop
 
-	man.path +=/usr/share/man/man1/
+	man.path += /usr/share/man/man1/
 	man.files += zsurf.1	
 	INSTALLS += man
 
