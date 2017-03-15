@@ -1,10 +1,13 @@
-QMAKE_CXXFLAGS += -Os -flto -std=c++0x -mno-align-double
+QMAKE_CXXFLAGS += -Ofast -flto -std=c++0x -mno-align-double
 
 QT += core
+QT += webkit
 QT += webkitwidgets
 
 TARGET = zsurf
 TEMPLATE = app
+
+CONFIG += release
 
 SOURCES = zsurf.cpp
 
@@ -25,5 +28,3 @@ SOURCES = zsurf.cpp
 	share.files += ./scripts/*
 	INSTALLS += desktop
 }
-
-HEADERS +=

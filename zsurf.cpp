@@ -1,118 +1,119 @@
-#include <stdio.h>
-#include <unistd.h>
 #include <QApplication>
 #include <QShortcut>
 #include <QWidget>
+#include <QDataStream>
 #include <QFileSystemWatcher>
+#include <QNetworkAccessManager>
+#include <QNetworkReply>
 #include <QNetworkProxy>
+#include <QNetworkConfiguration>
+#include <QSettings>
+#include <QFileDialog>
+#include <QWindow>
+#include <QMainWindow>
+#include <QLayout>
+#include <QTimer>
+#include <QList>
 #include <QFile>
 #include <QDir>
+#include <QtWebKit/QWebFullScreenRequest>
 #include <QtWebKitWidgets/QWebInspector>
 #include <QtWebKitWidgets/QWebView>
 #include <QtWebKitWidgets/QWebFrame>
 
-QWebView* webView;
+QApplication* application;
+QNetworkAccessManager* manager;
 QWebInspector* inspector;
+QFileSystemWatcher* watcher;
 QString script;
+QString userAgent;
+QString downloadPath;
+long embed;
+
+
+// Extend QWebPage to set user agent.
+class ZWebView : public QWebView {
+
+public :
+    Qt::WindowStates prevWindowState;
+
+    void keyPressEvent(QKeyEvent* e)
+    {
+        if(e->key() == Qt::Key_Escape && windowState() == Qt::WindowFullScreen){
+            QWebView::setWindowState(prevWindowState);
+            QWebView::page()->mainFrame()->evaluateJavaScript("document.webkitCancelFullScreen();");
+        } else
+        {
+            QWebView::keyPressEvent(e);
+        }
+    }
+};
+
+QList<ZWebView*> webViews;
+
+// Extend QWebPage to set user agent.
+class ZWebPage : public QWebPage {
+    QString userAgentForUrl(const QUrl &url ) const
+    {
+        return QString(userAgent);
+    }
+};
 
 // Function to load script.
-void loadScript(QString path){
-    QFile file(path);
+void loadScript(QString scriptPath)
+{
+    QFile file(scriptPath);
     if(file.open(QIODevice::ReadOnly))
     {
         script = file.readAll();
-        qDebug() << "Script loaded." << path;
+        qDebug() << "Script loaded." << scriptPath;
     } else
     {
-        qDebug() << "Error loading script." << path;
+        qDebug() << "Error loading script." << scriptPath;
     }
 }
 
-// Function to evaluate script.
-void evaluateScript(){
-    webView->page()->mainFrame()->evaluateJavaScript(script);
-    qDebug() << "Script evaluated.";
+// Allow live reload of script.
+void liveReload(QString scriptPath){
+    watcher = new QFileSystemWatcher();
+    watcher->addPath(scriptPath);
+    QObject::connect(watcher, &QFileSystemWatcher::fileChanged, [&, scriptPath]()
+    {
+        qDebug() << scriptPath;
+        qDebug() << "Detected change in script.";
+        QTimer::singleShot(1000, application, [scriptPath](){
+            loadScript(scriptPath);
+            watcher->addPath(scriptPath);
+            for (QWebView* webView : webViews){
+                webView->reload();
+            }
+        });
+    });
 }
 
-int main(int argc, char* argv[])
-{ 
-    QApplication application(argc, argv);
-
-    // Connect through proxy
-    QNetworkProxy proxy;
-    proxy.setHostName("127.0.0.1");
-    proxy.setPort(8118);
-    proxy.setType(QNetworkProxy::HttpProxy);
-    QNetworkProxy::setApplicationProxy(proxy);
-
-    // Performance Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LinksIncludedInFocusChain, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::SpatialNavigationEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::Accelerated2dCanvasEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::AcceleratedCompositingEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
-
-    // Media Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::MediaEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::MediaSourceEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebGLEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebAudioEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::FullScreenSupportEnabled, true);
-
-    // Privacy Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::OfflineStorageDatabaseEnabled, false);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::OfflineWebApplicationCacheEnabled, false);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalStorageDatabaseEnabled, false);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalStorageEnabled, false);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::PrivateBrowsingEnabled, true);
-
-    // Security Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::FrameFlatteningEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanOpenWindows, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanAccessClipboard, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessFileUrls, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::PluginsEnabled, false);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebSecurityEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::XSSAuditingEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::HyperlinkAuditingEnabled, true);
-
+// Method to open a Window.
+ZWebView* openWindow(QString url, bool visible)
+{
     // Initialize and show QWebView.
-    webView = new QWebView();
-    webView->show();
 
-    // Get path of script file.
-    QString scriptPath = QDir::homePath() + "/.zsurf/script.js";
+    ZWebView* webView = new ZWebView();
 
-    // Load and evaluate script.
-    loadScript(scriptPath);
-    evaluateScript();
+    ZWebPage* webPage = new ZWebPage();
 
-    // Allow live reload of script.
-    QFileSystemWatcher watcher;
-    watcher.addPath(QDir::homePath() + "/.zsurf/");
+    webPage->setNetworkAccessManager(manager);
 
-    QObject::connect(&watcher, &QFileSystemWatcher::directoryChanged, []()
-    {
-        qDebug() << "Detected change in script.";
-        usleep(1000000);
-        //loadScript(scriptPath);
-        //evaluateScript();
-    });
+    webView->setPage(webPage);
 
     // Evaluate script every time page is loaded.
-    QObject::connect(webView->page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, []()
+    QObject::connect(webView->page()->mainFrame(), &QWebFrame::initialLayoutCompleted, [&]()
     {
-        evaluateScript();
+        webView->page()->mainFrame()->evaluateJavaScript(script);
         qDebug() << "Script evaluated.";
     });
 
-    loadScript(scriptPath);
-
     // Bind inspector to key.
-    QShortcut *shortcut = new QShortcut(QKeySequence("F12"), webView);
-    webView->connect(shortcut, &QShortcut::activated, []()
+    QShortcut *inspectorShortcut = new QShortcut(QKeySequence("F12"), webView);
+    webView->connect(inspectorShortcut, &QShortcut::activated, [&]()
     {
         if(inspector == NULL)
         {
@@ -130,7 +131,201 @@ int main(int argc, char* argv[])
         }
     });
 
-    return application.exec();
+
+    // Handle fullscreen request
+    QObject::connect(webView->page(), &QWebPage::fullScreenRequested, [&](QWebFullScreenRequest request)
+    {
+        qDebug() << "Fullscreen request.";
+        request.accept();
+        if(request.toggleOn()){
+            webView->prevWindowState = webView->windowState();
+            webView->showFullScreen();
+        } else {
+            webView->setWindowState(webView->prevWindowState);
+        }
+    });
+
+    // Handle feature request
+    QObject::connect(webView->page(), &QWebPage::featurePermissionRequested, [&](QWebFrame* frame, QWebPage::Feature feature){
+        qDebug() << "Accepted feature request.";
+        webView->page()->setFeaturePermission(frame, feature, QWebPage::PermissionGrantedByUser);
+    });
+
+    // Handle download request
+    QObject::connect(webView->page(), &QWebPage::downloadRequested, [&](QNetworkRequest request)
+    {
+        qDebug() << "Download requested.";
+        qDebug() << downloadPath;
+        QString fileName = QFileDialog::getSaveFileName(webView, "Save File", downloadPath);
+
+        if(fileName != ""){
+            manager->get(request);
+            QObject::connect(manager, &QNetworkAccessManager::finished, [&,fileName](QNetworkReply* reply)
+            {
+                QFile file(fileName);
+                if(file.open(QIODevice::WriteOnly))
+                {
+                    QDataStream out(&file);
+                    out.writeRawData(reply->readAll(), reply->size());
+
+                    qDebug() << "Download Saved! " << fileName;
+                } else
+                {
+                    qDebug() << "Error writing download to file. " << fileName;
+                }
+
+                qDebug() << "Download finished.";
+
+
+            });
+        }
+    });
+
+    if(!url.isEmpty())
+    {
+        // Load specified page.
+        webView->load(QUrl(url));
+    } else
+    {
+        // Evaluate script
+        webView->page()->mainFrame()->evaluateJavaScript(script);
+    }
+
+    // Display window
+    if(embed)
+    {
+        QWidget* widget = QWidget::createWindowContainer(QWindow::fromWinId(embed));
+        webView->setParent(widget);
+
+        if(visible)
+        {
+            widget->show();
+        }
+
+    } else if(visible)
+    {
+        webView->show();
+    }
+
+    return webView;
 }
 
+// Load configuration settings.
+void loadConfig(QString configPath)
+{
+    QSettings settings(configPath, QSettings::IniFormat);
 
+    // Get download path
+    if(!settings.value("download_path").isNull())
+    {
+        downloadPath = settings.value("download_path").toString();
+    } else
+    {
+        qDebug() << "Using default download path";
+        downloadPath = QDir::homePath() + "/Downloads";
+    }
+
+    // Store user agent
+    userAgent = settings.value("user_agent").toString();
+
+
+    // Set Do Not Track
+
+    // Split proxy ip and port
+    QStringList proxyAddress = settings.value("proxy_address").toString().split(":");
+
+    // Connect through proxy
+    QNetworkProxy proxy;
+    proxy.setHostName(proxyAddress.first());
+    proxy.setPort(proxyAddress.last().toInt());
+
+    if(settings.value("proxy_type") == "none")
+    {
+        proxy.setType(QNetworkProxy::NoProxy);
+    } else if(settings.value("proxy_type") == "socks5")
+    {
+        proxy.setType(QNetworkProxy::Socks5Proxy);
+    } else if(settings.value("proxy_type") == "http")
+    {
+        proxy.setType(QNetworkProxy::HttpProxy);
+    } else if(settings.value("proxy_type") == "http_caching")
+    {
+        proxy.setType(QNetworkProxy::HttpCachingProxy);
+    } else if(settings.value("proxy_type") == "ftp")
+    {
+        proxy.setType(QNetworkProxy::FtpCachingProxy);
+    } else
+    {
+        proxy.setType(QNetworkProxy::DefaultProxy);
+    }
+    QNetworkProxy::setApplicationProxy(proxy);
+
+    // Performance Settings
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::LinksIncludedInFocusChain, settings.value("links_included_in_focus_chain").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::SpatialNavigationEnabled, settings.value("spatial_navication").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::Accelerated2dCanvasEnabled, settings.value("accelerated_2d_canvas").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::AcceleratedCompositingEnabled, settings.value("accelerated_compositing").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, settings.value("dns_prefetch").toBool());
+
+    // Media Settings
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::MediaEnabled, settings.value("media_enabled").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::MediaSourceEnabled,settings.value("media_source").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebGLEnabled,settings.value("webgl").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebAudioEnabled, settings.value("web_audio").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::FullScreenSupportEnabled,settings.value("full_screen_support").toBool());
+
+    // Privacy Settings
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::OfflineStorageDatabaseEnabled,settings.value("offline_storage_database").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::OfflineWebApplicationCacheEnabled,settings.value("offline_web_application_cache").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalStorageDatabaseEnabled,settings.value("local_storage_database").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalStorageEnabled,settings.value("local_storage").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::PrivateBrowsingEnabled,settings.value("private_browsing").toBool());
+
+    // Security Settings
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::FrameFlatteningEnabled,settings.value("frame_flattening").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanCloseWindows,settings.value("javascript_can_close_windows").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanOpenWindows,settings.value("javascript_can_open_windows").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanAccessClipboard,settings.value("javascript_can_access_clipboard").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptEnabled,settings.value("javascript").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessFileUrls, settings.value("local_content_can_access_file_urls").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls,settings.value("local_content_can_access_remote_urls").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::PluginsEnabled,settings.value("plugins").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebSecurityEnabled,settings.value("web_security").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::XSSAuditingEnabled,settings.value("xss_auditing").toBool());
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::HyperlinkAuditingEnabled, settings.value("hyperlink_auditing").toBool());
+}
+
+int main(int argc, char* argv[])
+{
+    // Initialize application
+    application = new QApplication(argc, argv);
+
+    // Read terminal parameters
+    for(int i = 0; i < argc; i++){
+        if(QString(argv[i]) == "-e"){
+            i++;
+            embed = QString(argv[i]).toLong();
+        }
+    }
+
+    // Initialize network manger
+    manager = new QNetworkAccessManager();
+
+    // Load config
+    loadConfig(QDir::homePath() + "/.zsurf/config.ini");
+
+    // Get path of script file.
+    loadScript(QDir::homePath() + "/.zsurf/script.js");
+
+    // Watch file for changes
+    liveReload(QDir::homePath() + "/.zsurf/script.js");
+
+    // Open primary web view.
+    webViews.push_back( openWindow("http://duckduckgo.com", true) );
+
+    //QWindow::fromWinId(argv[0])
+
+    // Return exit status.
+    return application->exec();
+
+}
