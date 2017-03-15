@@ -14,6 +14,7 @@
 #include <QLayout>
 #include <QTimer>
 #include <QList>
+#include <QFileInfo>
 #include <QFile>
 #include <QDir>
 #include <QtWebKit/QWebFullScreenRequest>
@@ -25,11 +26,15 @@ QApplication* application;
 QNetworkAccessManager* manager;
 QWebInspector* inspector;
 QFileSystemWatcher* watcher;
-QString script;
-QString userAgent;
-QString downloadPath;
-long embed;
 
+QList<QString> requireList;
+QList<QString> scriptList;
+QString configPath;
+QString scriptPath;
+QString downloadPath;
+QString userAgent;
+QString homePage;
+long embed;
 
 // Extend QWebPage to set user agent.
 class ZWebView : public QWebView {
@@ -60,31 +65,47 @@ class ZWebPage : public QWebPage {
 };
 
 // Function to load script.
-void loadScript(QString scriptPath)
+void loadScripts()
 {
-    QFile file(scriptPath);
-    if(file.open(QIODevice::ReadOnly))
+    scriptList.clear();
+    for(int i = 0; i < requireList.length(); i++)
     {
-        script = file.readAll();
-        qDebug() << "Script loaded." << scriptPath;
-    } else
-    {
-        qDebug() << "Error loading script." << scriptPath;
+        QFile file(scriptPath + requireList[i]);
+        if(file.open(QIODevice::ReadOnly))
+        {
+            scriptList.push_back(file.readAll());
+            qDebug() << "Script loaded:" << scriptPath << requireList[i];
+        } else
+        {
+            qDebug() << "Error loading script:" << scriptPath << requireList[i];
+        }
     }
 }
 
 // Allow live reload of script.
-void liveReload(QString scriptPath){
+void liveReload()
+{
     watcher = new QFileSystemWatcher();
-    watcher->addPath(scriptPath);
-    QObject::connect(watcher, &QFileSystemWatcher::fileChanged, [&, scriptPath]()
+
+    for(int i = 0; i < requireList.length(); i++)
     {
-        qDebug() << scriptPath;
-        qDebug() << "Detected change in script.";
-        QTimer::singleShot(1000, application, [scriptPath](){
-            loadScript(scriptPath);
-            watcher->addPath(scriptPath);
-            for (QWebView* webView : webViews){
+        watcher->addPath(scriptPath + requireList[i]);
+    }
+
+    QObject::connect(watcher, &QFileSystemWatcher::fileChanged, [&, requireList]()
+    {
+        qDebug() << "Detected change in scripts.";
+        QTimer::singleShot(1000, application, [requireList]()
+        {
+            loadScripts();
+
+            for(int i = 0; i < requireList.length(); i++)
+            {
+                watcher->addPath(scriptPath + requireList[i]);
+            }
+
+            for (QWebView* webView : webViews)
+            {
                 webView->reload();
             }
         });
@@ -95,7 +116,6 @@ void liveReload(QString scriptPath){
 ZWebView* openWindow(QString url, bool visible)
 {
     // Initialize and show QWebView.
-
     ZWebView* webView = new ZWebView();
 
     ZWebPage* webPage = new ZWebPage();
@@ -107,8 +127,11 @@ ZWebView* openWindow(QString url, bool visible)
     // Evaluate script every time page is loaded.
     QObject::connect(webView->page()->mainFrame(), &QWebFrame::initialLayoutCompleted, [&]()
     {
-        webView->page()->mainFrame()->evaluateJavaScript(script);
-        qDebug() << "Script evaluated.";
+        for(int i = 0; i < scriptList.size(); i++)
+        {
+            webView->page()->mainFrame()->evaluateJavaScript(scriptList[i]);
+        }
+        qDebug() << "Scripts evaluated.";
     });
 
     // Bind inspector to key.
@@ -155,7 +178,6 @@ ZWebView* openWindow(QString url, bool visible)
     QObject::connect(webView->page(), &QWebPage::downloadRequested, [&](QNetworkRequest request)
     {
         qDebug() << "Download requested.";
-        qDebug() << downloadPath;
         QString fileName = QFileDialog::getSaveFileName(webView, "Save File", downloadPath);
 
         if(fileName != ""){
@@ -173,10 +195,6 @@ ZWebView* openWindow(QString url, bool visible)
                 {
                     qDebug() << "Error writing download to file. " << fileName;
                 }
-
-                qDebug() << "Download finished.";
-
-
             });
         }
     });
@@ -187,8 +205,11 @@ ZWebView* openWindow(QString url, bool visible)
         webView->load(QUrl(url));
     } else
     {
-        // Evaluate script
-        webView->page()->mainFrame()->evaluateJavaScript(script);
+        // Evaluate scripts
+        for(int i = 0; i < scriptList.size(); i++)
+        {
+            webView->page()->mainFrame()->evaluateJavaScript(scriptList[i]);
+        }
     }
 
     // Display window
@@ -211,25 +232,58 @@ ZWebView* openWindow(QString url, bool visible)
 }
 
 // Load configuration settings.
-void loadConfig(QString configPath)
+void loadConfig()
 {
+    // Determine location of config
+    if(configPath.isEmpty()){
+        QFileInfo fileInfo(QDir::homePath() + "/.zsurf/config.ini");
+
+        if(fileInfo.exists() && fileInfo.isFile())
+        {
+            configPath = fileInfo.absoluteFilePath();
+        } else
+        {
+            configPath = "/usr/share/zsurf/config.ini";
+        }
+    }
+
+    // Load config
     QSettings settings(configPath, QSettings::IniFormat);
 
-    // Get download path
+    qDebug() << "Config loaded:" << configPath;
+
+    // Set home page
+    homePage = settings.value("home_page").toString();
+
+    // Set script path
+    if(!settings.value("script_path").isNull())
+    {
+        scriptPath = settings.value("script_path").toString();
+    } else
+    {
+        scriptPath = "/usr/share/zsurf/scripts/";
+    }
+
+    // Set download path
     if(!settings.value("download_path").isNull())
     {
         downloadPath = settings.value("download_path").toString();
     } else
     {
-        qDebug() << "Using default download path";
-        downloadPath = QDir::homePath() + "/Downloads";
+        downloadPath = QDir::homePath() + "/Downloads/";
+    }
+
+    // Set list of scripts to require
+    if(!settings.value("require_scripts").isNull())
+    {
+        requireList = settings.value("require_scripts").toString().split(' ');
+    } else
+    {
+        requireList.push_back("default.js");
     }
 
     // Store user agent
     userAgent = settings.value("user_agent").toString();
-
-
-    // Set Do Not Track
 
     // Split proxy ip and port
     QStringList proxyAddress = settings.value("proxy_address").toString().split(":");
@@ -239,6 +293,7 @@ void loadConfig(QString configPath)
     proxy.setHostName(proxyAddress.first());
     proxy.setPort(proxyAddress.last().toInt());
 
+    // Determine proxy type
     if(settings.value("proxy_type") == "none")
     {
         proxy.setType(QNetworkProxy::NoProxy);
@@ -301,10 +356,16 @@ int main(int argc, char* argv[])
     application = new QApplication(argc, argv);
 
     // Read terminal parameters
-    for(int i = 0; i < argc; i++){
+    for(int i = 1; i < argc; i++){
         if(QString(argv[i]) == "-e"){
             i++;
             embed = QString(argv[i]).toLong();
+        } else if(QString(argv[i]) == "-c"){
+            i++;
+            configPath = QString(argv[i]).toLong();
+        } else
+        {
+            qDebug() << "Unknown option: " << QString(argv[i]);
         }
     }
 
@@ -312,18 +373,16 @@ int main(int argc, char* argv[])
     manager = new QNetworkAccessManager();
 
     // Load config
-    loadConfig(QDir::homePath() + "/.zsurf/config.ini");
+    loadConfig();
 
     // Get path of script file.
-    loadScript(QDir::homePath() + "/.zsurf/script.js");
+    loadScripts();
 
     // Watch file for changes
-    liveReload(QDir::homePath() + "/.zsurf/script.js");
+    liveReload();
 
     // Open primary web view.
-    webViews.push_back( openWindow("http://duckduckgo.com", true) );
-
-    //QWindow::fromWinId(argv[0])
+    webViews.push_back( openWindow(homePage, true) );
 
     // Return exit status.
     return application->exec();

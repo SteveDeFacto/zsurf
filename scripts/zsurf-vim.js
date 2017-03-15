@@ -155,8 +155,11 @@ function judgeHintNum(hintNum) {
 }
 
 function execSelect(elem) {
+	
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
+	var tracking = elem.getAttribute('data-ui-tracking-context') ? elem.getAttribute('data-ui-tracking-context').toLowerCase(): "";
+	console.log(tracking);
     if (tagName == 'a' && elem.href != '') {
         setHighlight(elem, true);
         // TODO: ajax, <select>
@@ -164,13 +167,13 @@ function execSelect(elem) {
             window.open(elem.href);
         else location.href=elem.href;
 
-    } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset")) {
-        elem.click();
+    } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset" || tracking)) {
+		simulate(elem, 'dblclick');
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
         // TODO: toggle checkbox
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
-		simulate(elem, 'click')
+		simulate(elem, 'dblclick');
         elem.setSelectionRange(elem.value.length, elem.value.length);
     }
     removeHints();
@@ -183,7 +186,7 @@ function setHints() {
     var winLeft = window.scrollX/zoomLevel;
     var winRight = winLeft + (window.innerWidth/zoomLevel);
     // TODO: <area>
-    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), textarea, select, button');
+    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], textarea, select, button, [onclick], [data-ui-tracking-context]');
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
     document.body.appendChild(div);
@@ -389,7 +392,6 @@ function findPrev()
 	].join('');
 				
 	scrollToPosition(highlights[findPointer]);
-	
 }
 
 function scrollToPosition(field)
@@ -399,7 +401,6 @@ function scrollToPosition(field)
 	var scrollBottom = (window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight) + scrollTop;
 	var scrollRight = (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth) + scrollLeft;
 
-   
    if (field)
    {
 	   var theElement = field;  
@@ -418,7 +419,6 @@ function scrollToPosition(field)
 	}
 }
 
-
 function getStyle(el,styleProp)
 {
 	var x = (document.getElementById(el)) ? document.getElementById(el) : el;
@@ -428,7 +428,6 @@ function getStyle(el,styleProp)
 		var y = document.defaultView.getComputedStyle(x,null).getPropertyValue(styleProp);
 	return y;
 }
-
 
 function parseCommand(e){
 	if(e.keyCode == 13) {
@@ -469,7 +468,6 @@ function parseCommand(e){
 		}
 	}
 } 
-
 
 function inputText(command){
     var input = document.createElement('input');

@@ -24,7 +24,11 @@ SOURCES = zsurf.cpp
 	man.files += zsurf.1	
 	INSTALLS += man
 
-	share.path += /usr/share/zsurf/
-	share.files += ./scripts/*
-	INSTALLS += desktop
+	config.path += /usr/share/zsurf/
+	config.files += config.ini
+	INSTALLS += config
+
+	scripts.path += /usr/share/zsurf/scripts/
+	scripts.files += ./scripts/*
+	INSTALLS += scripts
 }
