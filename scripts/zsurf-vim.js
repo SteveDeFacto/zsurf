@@ -11,14 +11,16 @@ var findPointer = -1;
 var bypassBlocker = false;
 var zoomLevel = 1;
 
-// Remove scrollbars
+// Remove scrollbars.
 document.documentElement.style.overflow = 'hidden';
+
+// Unfocus any elements which might be focused by default.
+window.addEventListener("DOMContentLoaded", function(event) { 
+	unfocus();
+});
 
 window.addEventListener("load", function(event) { 
 
-	// Unfocus elements on page
-	unfocus();
-	
 	// Add Google search bar to list of elements to block focus stealing.
 	blockElems = blockElems.concat(Array.from(document.querySelectorAll("input.gsfi")));
 
@@ -156,6 +158,8 @@ function judgeHintNum(hintNum) {
 function execSelect(elem) {
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
+	var tracking = elem.getAttribute('data-ui-tracking-context') ? elem.getAttribute('data-ui-tracking-context').toLowerCase(): "";
+	console.log(tracking);
     if (tagName == 'a' && elem.href != '') {
         setHighlight(elem, true);
         // TODO: ajax, <select>

@@ -1,6 +1,6 @@
 
 # Maintainer: StevenDeFacto <srbatchelor@ovgl.org>
-pkgname=zsurf
+pkgname=zsurf-git
 _pkgname=${pkgname%-*}
 pkgver=0.1.0
 pkgrel=1
