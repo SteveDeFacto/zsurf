@@ -138,7 +138,6 @@ function setHintRules() {
 
 function deleteHintRules() {
     var ss = document.styleSheets[0];
-
 	if(ss != undefined) {
     	ss.deleteRule(0);
     	ss.deleteRule(0);
@@ -155,11 +154,8 @@ function judgeHintNum(hintNum) {
 }
 
 function execSelect(elem) {
-	
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
-	var tracking = elem.getAttribute('data-ui-tracking-context') ? elem.getAttribute('data-ui-tracking-context').toLowerCase(): "";
-	console.log(tracking);
     if (tagName == 'a' && elem.href != '') {
         setHighlight(elem, true);
         // TODO: ajax, <select>
@@ -167,15 +163,17 @@ function execSelect(elem) {
             window.open(elem.href);
         else location.href=elem.href;
 
-    } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset" || tracking)) {
-		simulate(elem, 'click');
+    } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset")) {
+		elem.click();
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
         // TODO: toggle checkbox
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
-		simulate(elem, 'click');
+		elem.focus();
         elem.setSelectionRange(elem.value.length, elem.value.length);
-    }
+    } else {
+		elem.click();
+	}
     removeHints();
 }
 
