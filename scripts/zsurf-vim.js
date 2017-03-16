@@ -173,7 +173,7 @@ function execSelect(elem) {
         // TODO: toggle checkbox
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
-		elem.focus();
+		elem.click();
         elem.setSelectionRange(elem.value.length, elem.value.length);
     } else {
 		elem.click();
@@ -624,10 +624,10 @@ function initKeyBind(e){
 			addKeyBind( 'p', function(){findPrev();}, e );
 			addKeyBind( 'n', function(){findNext();}, e );
 
-		} else{
-			addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
 		}
     }
+
+	addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
 }
 
 var keyId = {
