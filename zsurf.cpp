@@ -237,7 +237,6 @@ ZWebView* openWindow(QString url, bool visible)
         webView->resize(width, height);
     });
 
-
     return webView;
 }
 
@@ -273,6 +272,16 @@ void loadConfig()
     {
         scriptPath = "/usr/share/zsurf/scripts/";
     }
+
+    // Set cache path
+    if(!settings.value("cache_path").isNull())
+    {
+        QWebSettings::globalSettings()->setOfflineWebApplicationCachePath(settings.value("cache_path").toString());
+    } else
+    {
+        QWebSettings::globalSettings()->setOfflineWebApplicationCachePath("/tmp/zsurf/cache/");
+    }
+
 
     // Set download path
     if(!settings.value("download_path").isNull())
