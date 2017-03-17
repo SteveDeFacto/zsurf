@@ -11,16 +11,20 @@ var findPointer = -1;
 var bypassBlocker = false;
 var zoomLevel = 1;
 
-// Remove scrollbars.
-document.documentElement.style.overflow = 'hidden';
+//window.addEventListener("DOMContentLoaded", function(event) { 
+
 
 // Unfocus any elements which might be focused by default.
 window.addEventListener("DOMContentLoaded", function(event) { 
+
+	// Remove scrollbars.
+	document.documentElement.style.overflow = 'hidden';
+
 	unfocus();
 });
 
 window.addEventListener("load", function(event) { 
-
+	
 	// Add Google search bar to list of elements to block focus stealing.
 	blockElems = blockElems.concat(Array.from(document.querySelectorAll("input.gsfi")));
 
@@ -30,22 +34,22 @@ window.addEventListener("load", function(event) {
 		block.onclick = function(e){allowFocus.push(this);};
 		block.onfocus = function(e){
 			if(!bypassBlocker){
-			if(allowFocus.indexOf(this)==-1){
-				this.blur();
-				setTimeout(function(){
-					if(allowFocus.indexOf(block) != -1) {
-						console.log("allow focus");
-						block.focus();
-					}
-					else {
-						allowFocus.splice(i,1);
-						console.log("block focus");
-					}
-				}, 1, block, i);
-			} else
-			{
-				allowFocus.splice(i,1);
-			}
+				if(allowFocus.indexOf(this)==-1){
+					this.blur();
+					setTimeout(function(){
+						if(allowFocus.indexOf(block) != -1) {
+							console.log("allow focus");
+							block.focus();
+						}
+						else {
+							allowFocus.splice(i,1);
+							console.log("block focus");
+						}
+					}, 1, block, i);
+				} else
+				{
+					allowFocus.splice(i,1);
+				}
 			} else {
 				bypassBlocker = false;	
 			}
@@ -53,7 +57,7 @@ window.addEventListener("load", function(event) {
 	}
 });
 
-document.addEventListener( 'keydown', initKeyBind, true );
+window.addEventListener('keydown', initKeyBind, true, true);
 
 function toString(num){
 	var strNum = '';
@@ -79,6 +83,13 @@ function simulate(el, etype){
     evObj.initEvent(etype, true, false);
     el.dispatchEvent(evObj);
   }
+}
+
+function simulateScroll(delta) {
+  var evt = document.createEvent("MouseEvents");
+  evt.initEvent('mousewheel', true, true);
+  evt.wheelDelta = delta;
+  document.dispatchEvent(evt);
 }
 
 function hintMode(newtab){
@@ -593,8 +604,7 @@ function initKeyBind(e){
     var t = e.target;
     if( t.nodeType == 1){
 		if( textInputs.indexOf(document.activeElement.type) == -1 &&
-			document.activeElement.contentEditable != true
-			){
+			document.activeElement.contentEditable != true){
 			addKeyBind( 'f', function(){hintMode();}, e );
 			addKeyBind( 'F', function(){hintMode(true);}, e );
 			addKeyBind( 'o', function(){inputText(":open ");}, e );
@@ -623,7 +633,6 @@ function initKeyBind(e){
 			addKeyBind( 'Divide', function(){inputText(":search ");}, e );
 			addKeyBind( 'p', function(){findPrev();}, e );
 			addKeyBind( 'n', function(){findNext();}, e );
-
 		}
     }
 
@@ -729,3 +738,4 @@ function getKey(evt){
     }
     return ctrl+meta+key;
 }
+//}
