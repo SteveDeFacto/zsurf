@@ -560,7 +560,10 @@ function inputText(command){
 function unfocus(){
 	removeHints()
 	if(document.activeElement != null){
-		document.querySelector("#zsurf-console").remove();
+		var console = document.querySelector("#zsurf-console");
+		if(console != null){
+			console.remove();
+		}
 		setTimeout(function(){
 			document.activeElement.blur();
 		}, 1);
