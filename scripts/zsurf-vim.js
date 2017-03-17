@@ -11,15 +11,15 @@ var findPointer = -1;
 var bypassBlocker = false;
 var zoomLevel = 1;
 
-// Unfocus any elements which might be focused by default.
-document.addEventListener("DOMContentLoaded", function(event) { 
-
+document.addEventListener("DOMContentLoaded", function(event) {
 	// Remove scrollbars.
 	document.documentElement.style.overflow = 'hidden';
+
+	// Unfocus any elements which might be focused by default.
 	unfocus();
 });
 
-document.addEventListener("load", function(event) { 
+window.addEventListener("load", function(event) { 
 	
 	// Add Google search bar to list of elements to block focus stealing.
 	blockElems = blockElems.concat(Array.from(document.querySelectorAll("input.gsfi")));
@@ -34,12 +34,10 @@ document.addEventListener("load", function(event) {
 					this.blur();
 					setTimeout(function(){
 						if(allowFocus.indexOf(block) != -1) {
-							console.log("allow focus");
 							block.focus();
 						}
 						else {
 							allowFocus.splice(i,1);
-							console.log("block focus");
 						}
 					}, 1, block, i);
 				} else
@@ -167,6 +165,7 @@ function execSelect(elem) {
     var type = elem.type ? elem.type.toLowerCase() : "";
 	var tracking = elem.getAttribute('data-ui-tracking-context') ? elem.getAttribute('data-ui-tracking-context').toLowerCase(): "";
 	console.log(tracking);
+	bypassBlocker = true;
     if (tagName == 'a' && elem.href != '') {
         setHighlight(elem, true);
         // TODO: ajax, <select>
@@ -177,7 +176,6 @@ function execSelect(elem) {
     } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset")) {
 		elem.click();
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
-        // TODO: toggle checkbox
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
 		elem.click();
@@ -562,14 +560,10 @@ function inputText(command){
 function unfocus(){
 	removeHints()
 	if(document.activeElement != null){
-		if(document.activeElement.id.indexOf('zsurf-console') == -1){
-				setTimeout(function(){
-					document.activeElement.blur();
-				}, 1);
-			
-		} else {
-			document.activeElement.remove();
-		}
+		document.querySelector("#zsurf-console").remove();
+		setTimeout(function(){
+			document.activeElement.blur();
+		}, 1);
 	}
 }
 
@@ -631,7 +625,7 @@ function initKeyBind(e){
 			addKeyBind( 'n', function(){findNext();}, e );
 		}
     }
-
+	
 	addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
 }
 
