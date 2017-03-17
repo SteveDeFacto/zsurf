@@ -11,19 +11,15 @@ var findPointer = -1;
 var bypassBlocker = false;
 var zoomLevel = 1;
 
-//window.addEventListener("DOMContentLoaded", function(event) { 
-
-
 // Unfocus any elements which might be focused by default.
-window.addEventListener("DOMContentLoaded", function(event) { 
+document.addEventListener("DOMContentLoaded", function(event) { 
 
 	// Remove scrollbars.
 	document.documentElement.style.overflow = 'hidden';
-
 	unfocus();
 });
 
-window.addEventListener("load", function(event) { 
+document.addEventListener("load", function(event) { 
 	
 	// Add Google search bar to list of elements to block focus stealing.
 	blockElems = blockElems.concat(Array.from(document.querySelectorAll("input.gsfi")));
@@ -57,7 +53,7 @@ window.addEventListener("load", function(event) {
 	}
 });
 
-window.addEventListener('keydown', initKeyBind, true, true);
+document.addEventListener('keydown', initKeyBind, true, true);
 
 function toString(num){
 	var strNum = '';
@@ -738,4 +734,3 @@ function getKey(evt){
     }
     return ctrl+meta+key;
 }
-//}
