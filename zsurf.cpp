@@ -7,6 +7,7 @@
 #include <QNetworkReply>
 #include <QNetworkProxy>
 #include <QNetworkConfiguration>
+#include <QNetworkDiskCache>
 #include <QSettings>
 #include <QFileDialog>
 #include <QWindow>
@@ -17,6 +18,8 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QDir>
+#include <QtWebKit/QWebHistory>
+#include <QtWebKit/QWebElement>
 #include <QtWebKit/QWebFullScreenRequest>
 #include <QtWebKitWidgets/QWebInspector>
 #include <QtWebKitWidgets/QWebView>
@@ -26,6 +29,7 @@ QApplication* application;
 QNetworkAccessManager* manager;
 QWebInspector* inspector;
 QFileSystemWatcher* watcher;
+QNetworkDiskCache* cache;
 
 QList<QString> requireList;
 QList<QString> scriptList;
@@ -35,6 +39,8 @@ QString downloadPath;
 QString userAgent;
 QString homePage;
 long embed;
+long maxHistory;
+bool cacheEnabled;
 
 // Extend QWebView to break fullscreen on Esc.
 class ZWebView : public QWebView {
@@ -115,6 +121,11 @@ void liveReload()
 // Method to open a Window.
 ZWebView* openWindow(QString url, bool visible)
 {
+    cache = new QNetworkDiskCache();
+    cache->setCacheDirectory("/tmp/");
+    cache->setMaximumCacheSize(0);
+    manager->setCache(cache);
+
     // Initialize and show QWebView.
     ZWebView* webView = new ZWebView();
 
@@ -124,9 +135,15 @@ ZWebView* openWindow(QString url, bool visible)
 
     webView->setPage(webPage);
 
+    webView->history()->setMaximumItemCount(maxHistory);
+
     // Evaluate script every time page is loaded.
     QObject::connect(webView->page()->mainFrame(), &QWebFrame::initialLayoutCompleted, [&]()
     {
+        if(!cacheEnabled){
+            QWebSettings::clearMemoryCaches();
+        }
+
         for(int i = 0; i < scriptList.size(); i++)
         {
             webView->page()->mainFrame()->evaluateJavaScript(scriptList[i]);
@@ -149,7 +166,7 @@ ZWebView* openWindow(QString url, bool visible)
         {
             QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, false);
             inspector->setVisible(false);
-            delete inspector;
+            inspector->deleteLater();
             inspector = NULL;
         }
     });
@@ -261,6 +278,24 @@ void loadConfig()
 
     qDebug() << "Config loaded:" << configPath;
 
+    // Set max history
+    if(!settings.value("max_history").isNull())
+    {
+        maxHistory = settings.value("max_history").toInt();
+    } else
+    {
+        maxHistory = 3;
+    }
+
+    // Determine if cache is enabled
+    if(settings.value("cache_enabled").isNull()){
+        QWebSettings::globalSettings()->setObjectCacheCapacities(0,0,0);
+        QWebSettings::globalSettings()->setMaximumPagesInCache(0);
+        cacheEnabled = false;
+    } else {
+        cacheEnabled = true;
+    }
+
     // Set home page
     homePage = settings.value("home_page").toString();
 
@@ -333,6 +368,10 @@ void loadConfig()
         proxy.setType(QNetworkProxy::DefaultProxy);
     }
     QNetworkProxy::setApplicationProxy(proxy);
+
+
+    //QWebSettings::globalSettings()->setAttribute(QWebSettings::AutoLoadImages, false);
+
 
     // Performance Settings
     QWebSettings::globalSettings()->setAttribute(QWebSettings::LinksIncludedInFocusChain, settings.value("links_included_in_focus_chain").toBool());
