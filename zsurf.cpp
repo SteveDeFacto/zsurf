@@ -96,7 +96,7 @@ public :
                         QByteArray cookieData = cookie.toRawForm();
                         file.write(cookieData.data(), cookieData.length());
                         file.close();
-                        qDebug() << "Saved cookie: " << cookie.name;
+                        qDebug() << "Saved cookie: " << cookie.name();
                     }
                 }
             }
