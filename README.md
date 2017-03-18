@@ -17,6 +17,4 @@ sudo make install
 
 Issue with video streaming:
 
-Some videos that use hls will cause the browser to freeze. You can work around this issue by deleting or moving libgsthls.so (sudo mv /usr/lib/gstreamer-1.0/libgsthls.so /usr/lib/gstreamer-1.0/libgsthls.so.bak)
-
-Another workaround would be to use a plugin for video playback such as freshplayer(pepper flash), however, this is not advised since it greatly increases memory consumption and will limit your ability to interact with the plugin's controls.
+QtWebKit appears to have a memory leak in its implementation of gstreamer. Additionally, there appears to be an issue with some HLS videos which causes the browser to freeze. I suggest using FreshPlayer as a workaround for the time being. It's not as convenient since controlling videos will have to be done with mouse clicks. If a mouse is not an option, I suggest using KeyNav to perform the mouse clicks.
