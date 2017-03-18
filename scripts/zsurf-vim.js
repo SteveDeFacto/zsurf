@@ -597,7 +597,7 @@ function initKeyBind(e){
     var t = e.target;
     if( t.nodeType == 1){
 		if( textInputs.indexOf(document.activeElement.type) == -1 &&
-			document.activeElement.contentEditable != true){
+			document.activeElement.contentEditable != "true"){
 			addKeyBind( 'f', function(){hintMode();}, e );
 			addKeyBind( 'F', function(){hintMode(true);}, e );
 			addKeyBind( 'o', function(){inputText(":open ");}, e );
