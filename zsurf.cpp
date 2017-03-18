@@ -8,6 +8,8 @@
 #include <QNetworkProxy>
 #include <QNetworkConfiguration>
 #include <QNetworkDiskCache>
+#include <QNetworkCookieJar>
+#include <QNetworkCookie>
 #include <QSettings>
 #include <QFileDialog>
 #include <QWindow>
@@ -36,11 +38,71 @@ QList<QString> scriptList;
 QString configPath;
 QString scriptPath;
 QString downloadPath;
+QString cookiePath;
 QString userAgent;
 QString homePage;
 long embed;
 long maxHistory;
 bool cacheEnabled;
+bool saveCookies;
+
+class ZNetworkCookieJar : public QNetworkCookieJar {
+
+public :
+    ZNetworkCookieJar()
+    {
+        // Load session cookies
+        QDir cookieDir;
+        cookieDir.setPath(cookiePath);
+        QStringList fileList = cookieDir.entryList();
+        QByteArray cookiesData;
+        for(int i = 2; i < fileList.length(); i++)
+        {
+            QFile file(cookiePath + fileList[i]);
+            if(file.open(QIODevice::ReadOnly))
+            {
+                cookiesData.append(file.readAll() + '\n');
+                file.close();
+            } else
+            {
+                qDebug() << "Error loading cookie:" << cookiePath << fileList[i];
+            }
+        }
+
+        QList<QNetworkCookie> cookieList;
+        cookieList = QNetworkCookie::parseCookies(cookiesData);
+        if(cookieList.length() > 0) {
+            setAllCookies(cookieList);
+        }
+    }
+
+    bool setCookiesFromUrl(const QList<QNetworkCookie> &cookieList, const QUrl &url)
+    {
+        QNetworkCookieJar::setCookiesFromUrl(cookieList, url);
+        if(saveCookies)
+        {
+            for(int i = 0; i < cookieList.length(); i++)
+            {
+                if(!cookieList[i].isSessionCookie())
+                {
+                    QFile file(cookiePath + cookieList[i].name());
+                    if(file.open(QIODevice::WriteOnly))
+                    {
+                        QNetworkCookie cookie = cookieList[i];
+                        if(cookie.domain()[0] != '.')
+                        {
+                            cookie.setDomain('.' + cookie.domain());
+                        }
+                        QByteArray cookieData = cookie.toRawForm();
+                        file.write(cookieData.data(), cookieData.length());
+                        file.close();
+                        qDebug() << "Saved cookie: " << cookie.name;
+                    }
+                }
+            }
+        }
+    }
+};
 
 // Extend QWebView to break fullscreen on Esc.
 class ZWebView : public QWebView {
@@ -80,6 +142,7 @@ void loadScripts()
         if(file.open(QIODevice::ReadOnly))
         {
             scriptList.push_back(file.readAll());
+            file.close();
             qDebug() << "Script loaded:" << scriptPath << requireList[i];
         } else
         {
@@ -121,10 +184,6 @@ void liveReload()
 // Method to open a Window.
 ZWebView* openWindow(QString url, bool visible)
 {
-    cache = new QNetworkDiskCache();
-    cache->setCacheDirectory("/tmp/");
-    cache->setMaximumCacheSize(0);
-    manager->setCache(cache);
 
     // Initialize and show QWebView.
     ZWebView* webView = new ZWebView();
@@ -140,6 +199,8 @@ ZWebView* openWindow(QString url, bool visible)
     // Evaluate script every time page is loaded.
     QObject::connect(webView->page()->mainFrame(), &QWebFrame::initialLayoutCompleted, [&]()
     {
+
+
         if(!cacheEnabled){
             QWebSettings::clearMemoryCaches();
         }
@@ -150,6 +211,7 @@ ZWebView* openWindow(QString url, bool visible)
         }
         qDebug() << "Scripts evaluated.";
     });
+
 
     // Bind inspector to key.
     QShortcut *inspectorShortcut = new QShortcut(QKeySequence("F12"), webView);
@@ -170,7 +232,6 @@ ZWebView* openWindow(QString url, bool visible)
             inspector = NULL;
         }
     });
-
 
     // Handle fullscreen request
     QObject::connect(webView->page(), &QWebPage::fullScreenRequested, [&](QWebFullScreenRequest request)
@@ -275,8 +336,7 @@ void loadConfig()
 
     // Load config
     QSettings settings(configPath, QSettings::IniFormat);
-
-    qDebug() << "Config loaded:" << configPath;
+    qDebug() << "Config loaded:" << configPath;   
 
     // Set max history
     if(!settings.value("max_history").isNull())
@@ -317,7 +377,6 @@ void loadConfig()
         QWebSettings::globalSettings()->setOfflineWebApplicationCachePath("/tmp/zsurf/cache/");
     }
 
-
     // Set download path
     if(!settings.value("download_path").isNull())
     {
@@ -326,6 +385,22 @@ void loadConfig()
     {
         downloadPath = QDir::homePath() + "/Downloads/";
     }
+
+    // Set cookie path
+    if(!settings.value("cookies_path").isNull())
+    {
+        cookiePath = settings.value("cookies_path").toString();
+    } else
+    {
+        cookiePath = "/tmp/zsurf/cookies/";
+    }
+
+    // Create cookie jar and attach it to network manager.
+    ZNetworkCookieJar* cookies = new ZNetworkCookieJar();
+    manager->setCookieJar(cookies);
+
+    // Determine if we save session cookies or not.
+    saveCookies = settings.value("save_cookies").toBool();
 
     // Set list of scripts to require
     if(!settings.value("require_scripts").isNull())
@@ -370,7 +445,7 @@ void loadConfig()
     QNetworkProxy::setApplicationProxy(proxy);
 
 
-    //QWebSettings::globalSettings()->setAttribute(QWebSettings::AutoLoadImages, false);
+
 
 
     // Performance Settings
