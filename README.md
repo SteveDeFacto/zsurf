@@ -15,6 +15,3 @@ make
 
 sudo make install
 
-Issue with video streaming:
-
-QtWebKit appears to have a memory leak in its implementation of gstreamer. Additionally, there appears to be an issue with some HLS videos which causes the browser to freeze. I suggest using FreshPlayer as a workaround for the time being. It's not as convenient since controlling videos will have to be done with mouse clicks. If a mouse is not an option, I suggest using KeyNav to perform the mouse clicks.
