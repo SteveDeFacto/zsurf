@@ -7,14 +7,19 @@ var textInputs = ['textarea','date', 'datetime-local', 'email', 'file', 'month',
 var allowFocus = [];
 var blockElems = [];
 var highlights = [];
+var commandHistory = [':'];
+var commandPointer = -1;
 var findPointer = -1;
 var bypassBlocker = false;
 var zoomLevel = 1;
 
-document.addEventListener("DOMContentLoaded", function(event) {
-	// Remove scrollbars.
-	document.documentElement.style.overflow = 'hidden';
+// Remove scrollbars.
+document.body.style.overflow = 'hidden';
 
+
+//document.body.webkit-scrollbar.style.display = 'none'; 
+
+document.addEventListener("DOMContentLoaded", function(event) {
 	// Unfocus any elements which might be focused by default.
 	unfocus();
 });
@@ -209,24 +214,26 @@ function setHints() {
         if ( elemBottom >= winTop && elemTop <= winBottom) {
             hintElems.push(elem);
             setHighlight(elem, false);
-            var span = document.createElement('span');
-            span.style.cssText = [ 
+            var hint = document.createElement('div');
+            hint.style.cssText = [ 
                 'left: ', elemLeft, 'px !important;',
                 'top: ', elemTop, 'px !important;',
                 'position: absolute !important;',
-                'background-color: ' + (hintOpenInNewTab ? '#ff6600' : 'red') + ' !important;',
+                'background-color: ' + (hintOpenInNewTab ? '#ff6600' : '#ff0000c0') + ' !important;',
+				'border: 1px solid white !important;',
+				'text-shadow: 1px 1px #000000 !important;',
                 'color: white !important;',
 				'font-family: Arial, Helvetica, sans-serif !important;',
 				'font-style: normal !important;',
-                'font-size: 13px !important;',
+                'font-size: 16px !important;',
                 'font-weight: bold !important;',
                 'padding: 0px 1px !important;',
 				'margin: 0px !important;',
                 'z-index: 2147483647 !important;',
 				'text-transform: uppercase !important;',
-                    ].join('');
-            span.innerHTML = toString(hintElems.length);
-            div.appendChild(span);
+            ].join('');
+            hint.innerHTML = toString(hintElems.length);
+            div.appendChild(hint);
             if (elem.tagName.toLowerCase() == 'a') {
                 if (hintElems.length == 1) {
                     setHighlight(elem, true);
@@ -493,6 +500,7 @@ function parseCommand(e){
 
 		var div = document.getElementById('zsurf-panel');
 		var input = document.getElementById('zsurf-console');
+		commandHistory.push(input.value);
 
 		var commandTokens = input.value.split(' ');
 
@@ -500,28 +508,33 @@ function parseCommand(e){
 			commandTokens.shift();
 			var url = commandTokens.join(' ');
 			openUrl(url, false);
-			panel.remove();
+			div.remove();
 			return;
 		} else if( commandTokens[0] === ':search' ){
 			commandTokens.shift();
 			var search = commandTokens.join(' ');
 			find(search);
-			panel.remove();
+			div.remove();
 			return;
 		} else if( commandTokens[0] === ':openTab' ){
 			commandTokens.shift();
 			var url = commandTokens.join(' ');
 			openUrl(url, true);
-			panel.remove();
+			div.remove();
 			return;
 		} else if( commandTokens[0] === ':q' ){
 			window.close();
-			panel.remove();
+			div.remove();
 			return;
 		}
 
 	} else if(e.keyCode == 8) {
 		var input = document.getElementById('zsurf-console');
+
+		if(document.activeElement == input){
+			addKeyBind( 'Up', function(){prevCommand();}, e );
+			addKeyBind( 'Down', function(){nextCommand();}, e );
+		}
 
 		if(input.value.length == 1){
 			document.getElementById('zsurf-panel').remove();
@@ -532,75 +545,82 @@ function parseCommand(e){
 
 function inputText(command){
 
-	var div = document.createElement('div');
-	div.id = "zsurf-panel";
-	div.style.cssText = [
-		'right: 0px !important;',
-		'left: 0px !important;',
-		'bottom: 0px !important;',
-		'height: 30px !important;',
-		'position: fixed !important;',
-		'color: white !important;',
-		'background-color: black !important;',
-		'font-family: Arial, Helvetica, sans-serif !important;',
-		'font-style: normal !important;',
-        'font-size: 13px !important;',
-        'font-weight: bold !important;',
-		'outline: none !important;',
-        'z-index: 2147483647 !important;',
-		'margin: 0 !important;',
-		'padding: 0 !important;',
-    ].join('');
+	var console = document.getElementById('zsurf-console');
+	if(console == null) {
+		var div = document.createElement('div');
+		div.id = "zsurf-panel";
+		div.style.cssText = [
+			'right: 0px !important;',
+			'left: 0px !important;',
+			'bottom: 0px !important;',
+			'height: 26px !important;',
+			'position: fixed !important;',
+			'color: white !important;',
+			'background-color: #000000c6 !important;',
+			'font-family: Arial, Helvetica, sans-serif !important;',
+			'font-style: normal !important;',
+			'font-size: 13px !important;',
+			'font-weight: bold !important;',
+			'border-top: 1px dashed gray !important;',
+			'z-index: 2147483647 !important;',
+			'margin: 0 !important;',
+			'padding: 0 !important;',
+		].join('');
 
-    var input = document.createElement('input');
-	input.id = "zsurf-console";
-	input.type = "text";
-	input.addEventListener('keydown', parseCommand);
-    input.style.cssText = [ 
-		'left: 0px !important;',
-		'bottom: 0px !important;',
-		'width: 100% !important;',
-		'height: 26px !important;',
-		'position: fixed !important;',
-		'color: white !important;',
-		'background-color: transparent !important;',
-		'font-family: Arial, Helvetica, sans-serif !important;',
-		'font-style: normal !important;',
-        'font-size: 13px !important;',
-        'font-weight: bold !important;',
-		'outline: none !important;',
-		'border: 0 !important;',
-        'z-index: 2147483647 !important;',
-		'margin: 0 !important;',
-		'padding: 0 !important;',
-    ].join('');
+		var input = document.createElement('input');
+		input.id = "zsurf-console";
+		input.type = "text";
+		input.addEventListener('keydown', parseCommand);
+		input.style.cssText = [ 
+			'left: 0px !important;',
+			'bottom: 0px !important;',
+			'width: 100% !important;',
+			'height: 26px !important;',
+			'position: fixed !important;',
+			'color: white !important;',
+			'background-color: transparent !important;',
+			'font-family: Arial, Helvetica, sans-serif !important;',
+			'font-style: normal !important;',
+			'font-size: 13px !important;',
+			'font-weight: bold !important;',
+			'outline: none !important;',
+			'border: 0 !important;',
+			'z-index: 2147483647 !important;',
+			'margin: 0 !important;',
+			'padding: 0 !important;',
+		].join('');
 
-	input.value = command;
+		input.value = command;
 
-	var span = document.createElement('span');
-	span.id = "zsurf.location";
-	span.innerHTML = window.location.href;
-	span.style.cssText = [
-		'right: 0px !important;',
-		'bottom: 0px !important;',
-		'height: 21px !important;',
-		'position: fixed !important;',
-		'color: green !important;',
-		'font-family: Arial, Helvetica, sans-serif !important;',
-		'font-style: normal !important;',
-        'font-size: 13px !important;',
-        'font-weight: bold !important;',
-		'outline: none !important;',
-        'z-index: 2147483647 !important;',
-		'margin-right: 10px !important;',
-		'padding: 0 !important;',
-    ].join('');
+		var span = document.createElement('span');
+		span.id = "zsurf.location";
+		span.innerHTML = window.location.href;
+		span.style.cssText = [
+			'right: 0px !important;',
+			'bottom: 0px !important;',
+			'height: 22px !important;',
+			'position: fixed !important;',
+			'color: lime !important;',
+			'font-family: Arial, Helvetica, sans-serif !important;',
+			'font-style: normal !important;',
+			'font-size: 13px !important;',
+			'font-weight: bold !important;',
+			'outline: none !important;',
+			'z-index: 2147483647 !important;',
+			'margin: 0px 10px 0px 0px !important;',
+			'padding: 0 !important;',
+			'line-height: 18px !important;',
+		].join('');
 
-	div.appendChild(span);
-	div.appendChild(input);
+		div.appendChild(span);
+		div.appendChild(input);
 
-    document.body.appendChild(div);
-	input.focus();
+		document.body.appendChild(div);
+		input.focus();
+	} else {
+		console.value = command;
+		console.focus();
+	}
 }
 
 function unfocus(){
@@ -638,6 +658,25 @@ function zoom(step){
 	document.body.style.zoom = zoomLevel;
 }
 
+
+function prevCommand(){
+	if(commandPointer > 0){
+		commandPointer--;
+	} else {
+		commandPointer = commandHistory.length -1;
+	}
+	inputText(commandHistory[commandPointer]);
+}
+
+function nextCommand(){
+	if(commandPointer < commandHistory.length -1){
+		commandPointer++;
+	} else {
+		commandPointer = 0;
+	}
+	inputText(commandHistory[commandPointer]);
+}
+
 function initKeyBind(e){
 
     var t = e.target;
@@ -672,13 +711,25 @@ function initKeyBind(e){
 			addKeyBind( 'Divide', function(){inputText(":search ");}, e );
 			addKeyBind( 'p', function(){findPrev();}, e );
 			addKeyBind( 'n', function(){findNext();}, e );
+
+
 		}
     }
 	
+	var input = document.getElementById('zsurf-console');
+	if(document.activeElement == input){
+		addKeyBind( 'Up', function(){prevCommand();}, e );
+		addKeyBind( 'Down', function(){nextCommand();}, e );
+	}
+
 	addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
 }
 
 var keyId = {
+	"U+2190" : "Left",
+	"U+2191" : "Up",
+	"U+2192" : "Right",
+	"U+2193" : "Down",
     "U+0008" : "BackSpace",
     "U+0009" : "Tab",
     "U+0018" : "Cancel",
