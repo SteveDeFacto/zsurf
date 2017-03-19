@@ -10,6 +10,7 @@
 #include <QNetworkDiskCache>
 #include <QNetworkCookieJar>
 #include <QNetworkCookie>
+#include <QMessageBox>
 #include <QSettings>
 #include <QFileDialog>
 #include <QWindow>
@@ -256,7 +257,7 @@ ZWebView* openWindow(QString url, bool visible)
     QObject::connect(webView->page(), &QWebPage::downloadRequested, [&](QNetworkRequest request)
     {
         qDebug() << "Download requested.";
-        QString fileName = QFileDialog::getSaveFileName(webView, "Save File", downloadPath);
+        QString fileName = QFileDialog::getSaveFileName(webView, "Save File", downloadPath + request.url().fileName());
 
         if(fileName != ""){
             manager->get(request);
@@ -266,12 +267,18 @@ ZWebView* openWindow(QString url, bool visible)
                 if(file.open(QIODevice::WriteOnly))
                 {
                     QDataStream out(&file);
-                    out.writeRawData(reply->readAll(), reply->size());
+                    out.writeRawData(reply->readAll(), reply->size()); 
 
-                    qDebug() << "Download Saved! " << fileName;
+                    qDebug() << "Download Complete: " << fileName;
+                    QMessageBox msgBox;
+                    msgBox.setText("Download Complete: " + fileName);
+                    msgBox.show();
                 } else
                 {
-                    qDebug() << "Error writing download to file. " << fileName;
+                    qDebug() << "Download Failed: " << fileName;
+                    QMessageBox msgBox;
+                    msgBox.setText("Download Failed: " + fileName);
+                    msgBox.show();
                 }
             });
         }
