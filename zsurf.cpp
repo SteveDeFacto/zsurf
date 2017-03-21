@@ -198,7 +198,7 @@ ZWebView* openWindow(QString url, bool visible)
     webView->history()->setMaximumItemCount(maxHistory);
 
     // Evaluate script every time page is loaded.
-    QObject::connect(webView->page()->mainFrame(), &QWebFrame::initialLayoutCompleted, [&]()
+    QObject::connect(webView->page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, [&]()
     {
 
 

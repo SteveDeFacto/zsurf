@@ -13,21 +13,21 @@ var findPointer = -1;
 var bypassBlocker = false;
 var zoomLevel = 1;
 
+// Handle onwheel event
+window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
+
 // Remove scrollbars.
 document.body.style.overflow = 'hidden';
 
-
-//document.body.webkit-scrollbar.style.display = 'none'; 
-
-document.addEventListener("DOMContentLoaded", function(event) {
+document.addEventListener('DOMContentLoaded', function(event) {
 	// Unfocus any elements which might be focused by default.
 	unfocus();
 });
 
-window.addEventListener("load", function(event) { 
+window.addEventListener('load', function(event) { 
 	
 	// Add Google search bar to list of elements to block focus stealing.
-	blockElems = blockElems.concat(Array.from(document.querySelectorAll("input.gsfi")));
+	blockElems = blockElems.concat(Array.from(document.querySelectorAll('input.gsfi')));
 
 	// Block everything in blockElems from stealing focus.
 	for(i in blockElems){
@@ -173,17 +173,18 @@ function execSelect(elem) {
 	bypassBlocker = true;
     if (tagName == 'a' && elem.href != '') {
         setHighlight(elem, true);
-        // TODO: ajax, <select>
-        if (hintOpenInNewTab)
+        if (hintOpenInNewTab) {
             window.open(elem.href);
-        else location.href=elem.href;
-
+		} else {
+			location.href = elem.href;
+			elem.click();
+		}
     } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset")) {
 		elem.click();
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
-		elem.click();
+		elem.focus();
         elem.setSelectionRange(elem.value.length, elem.value.length);
     } else {
 		elem.click();
@@ -711,8 +712,6 @@ function initKeyBind(e){
 			addKeyBind( 'Divide', function(){inputText(":search ");}, e );
 			addKeyBind( 'p', function(){findPrev();}, e );
 			addKeyBind( 'n', function(){findNext();}, e );
-
-
 		}
     }
 	
