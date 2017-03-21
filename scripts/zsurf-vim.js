@@ -16,10 +16,12 @@ var zoomLevel = 1;
 // Handle onwheel event
 window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
 
-// Remove scrollbars.
-document.body.style.overflow = 'hidden';
-
 document.addEventListener('DOMContentLoaded', function(event) {
+
+	// Remove scrollbars.
+	document.body.style.overflow = 'hidden';
+	document.documentElement.style.overflow = 'hidden';
+
 	// Unfocus any elements which might be focused by default.
 	unfocus();
 });
