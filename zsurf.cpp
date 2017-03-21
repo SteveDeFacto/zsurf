@@ -198,7 +198,7 @@ ZWebView* openWindow(QString url, bool visible)
     webView->history()->setMaximumItemCount(maxHistory);
 
     // Evaluate script every time page is loaded.
-    QObject::connect(webView->page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, [&]()
+    QObject::connect(webView->page()->mainFrame(), &QWebFrame::initialLayoutCompleted, [&]()
     {
 
 
@@ -312,6 +312,10 @@ ZWebView* openWindow(QString url, bool visible)
     {
         webView->show();
     }
+
+    // Disable scrollbars
+    webView->page()->mainFrame()->setScrollBarPolicy(Qt::Horizontal,Qt::ScrollBarAlwaysOff);
+    webView->page()->mainFrame()->setScrollBarPolicy(Qt::Vertical,Qt::ScrollBarAlwaysOff);
 
     // Work around for resize bug.
     QTimer::singleShot(1000, application, [webView]()

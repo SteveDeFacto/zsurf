@@ -18,16 +18,13 @@ window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
 
 document.addEventListener('DOMContentLoaded', function(event) {
 
-	// Remove scrollbars.
-	document.body.style.overflow = 'hidden';
-	document.documentElement.style.overflow = 'hidden';
-
 	// Unfocus any elements which might be focused by default.
 	unfocus();
+
 });
 
 window.addEventListener('load', function(event) { 
-	
+
 	// Add Google search bar to list of elements to block focus stealing.
 	blockElems = blockElems.concat(Array.from(document.querySelectorAll('input.gsfi')));
 
