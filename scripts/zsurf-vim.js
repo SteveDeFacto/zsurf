@@ -12,50 +12,98 @@ var commandPointer = -1;
 var findPointer = -1;
 var bypassBlocker = false;
 var zoomLevel = 1;
+var eventListeners = {};
+var oldAddEventListener = null;
+var oldRemoveEventListener = null;
+var allowPassthrough = false;
+var passthroughEvents = [];
 
 // Handle onwheel event
 window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
 
 document.addEventListener('DOMContentLoaded', function(event) {
-
-	// Unfocus any elements which might be focused by default.
+	// Unfocus active textbox
 	unfocus();
-
-});
-
-window.addEventListener('load', function(event) { 
-
-	// Add Google search bar to list of elements to block focus stealing.
-	blockElems = blockElems.concat(Array.from(document.querySelectorAll('input.gsfi')));
-
-	// Block everything in blockElems from stealing focus.
-	for(i in blockElems){
-		block = blockElems[i];
-		block.onclick = function(e){allowFocus.push(this);};
-		block.onfocus = function(e){
-			if(!bypassBlocker){
-				if(allowFocus.indexOf(this)==-1){
-					this.blur();
-					setTimeout(function(){
-						if(allowFocus.indexOf(block) != -1) {
-							block.focus();
-						}
-						else {
-							allowFocus.splice(i,1);
-						}
-					}, 1, block, i);
-				} else
-				{
-					allowFocus.splice(i,1);
-				}
-			} else {
-				bypassBlocker = false;	
-			}
-		}
-	}
 });
 
 document.addEventListener('keydown', initKeyBind, true, true);
+
+// Intercept all calls to addEventListener or removeEventListener.
+oldAddEventListener = HTMLElement.prototype.addEventListener;
+oldRemoveEventListener = HTMLElement.prototype.removeEventListener;
+HTMLElement.prototype.addEventListener = addEventListenerExt;
+HTMLElement.prototype.removeEventListener = removeEventListenerExt;
+
+function addEventListenerExt(type, callback, capture){
+	if(eventListeners[this] == undefined) {
+		eventListeners[this] = [type];	
+	} else {
+		eventListeners[this].push(type);
+	}
+
+	if( (type != 'keydown' &&
+		type != 'keyup' &&
+		type != 'keypress') ||
+		callback == parseCommand){
+		return oldAddEventListener.apply(this, arguments);
+	} else if(!allowPassthrough){
+		passthroughEvents.push({
+			"element" : this,
+			"type" : type,
+			"callback" : callback,
+			"capture" : capture
+		});
+	}
+}
+
+function removeEventListenerExt(type, callback, capture){
+	
+	if(eventListeners[this] == undefined) {
+		eventListeners[this] = [];	
+	} else {
+		var i = eventListeners[this].indexOf(type);
+		if(i != -1) {
+			eventListeners[this].splice(type, i);
+		}
+	}
+
+	return oldRemoveEventListener.apply(this, arguments);
+}
+
+function togglePassthrough(){
+	console.log("try to toggle passthrough");
+	if(allowPassthrough){
+		console.log("togglePassthrough Off");
+
+		allowPassthrough = false;
+		for(var i = 0; i < passthroughEvents.length; i++){
+			passthroughEvents[i]['element'].removeEventListener(
+				passthroughEvents[i]['type'],
+				passthroughEvents[i]['callback'],
+				passthroughEvents[i]['capture']);
+		}
+		document.removeEventListener('keydown', initKeyBind, false, false);
+		
+		setTimeout(function(){
+			document.addEventListener('keydown', initKeyBind, true, true);
+		}, 1000);
+	} else {
+		console.log("togglePassthrough On");
+
+		allowPassthrough = true;
+		for(var i = 0; i < passthroughEvents.length; i++){
+			passthroughEvents[i]['element'].addEventListener(
+				passthroughEvents[i]['type'],
+				passthroughEvents[i]['callback'],
+				passthroughEvents[i]['capture']);
+		}
+		document.removeEventListener('keydown', initKeyBind, true, true);
+
+		setTimeout(function(){
+		document.addEventListener('keydown', initKeyBind, false, false);
+		}, 1000);
+	}
+}
 
 function toString(num){
 	var strNum = '';
@@ -167,8 +215,6 @@ function judgeHintNum(hintNum) {
 function execSelect(elem) {
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
-	var tracking = elem.getAttribute('data-ui-tracking-context') ? elem.getAttribute('data-ui-tracking-context').toLowerCase(): "";
-	console.log(tracking);
 	bypassBlocker = true;
     if (tagName == 'a' && elem.href != '') {
         setHighlight(elem, true);
@@ -183,7 +229,9 @@ function execSelect(elem) {
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
+		console.log("focus element");
 		elem.focus();
+		elem.click();
         elem.setSelectionRange(elem.value.length, elem.value.length);
     } else {
 		elem.click();
@@ -197,7 +245,9 @@ function setHints() {
     var winBottom = winTop + (window.innerHeight/zoomLevel);
     var winLeft = window.scrollX/zoomLevel;
     var winRight = winLeft + (window.innerWidth/zoomLevel);
-    // TODO: <area>
+	var lastElemLeft = 0;
+	var lastElemTop = 0;
+	var offsetLeft = 0;
     var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], textarea, select, button, [onclick], [data-ui-tracking-context]');
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
@@ -211,6 +261,14 @@ function setHints() {
         var elemBottom = winTop + pos.bottom;
         var elemLeft = winLeft + pos.left;
         var elemRight = winLeft + pos.left;
+		if(elemLeft == lastElemLeft && elemTop ==lastElemTop){
+			offsetLeft += 20;
+			elemLeft += offsetLeft;
+		} else {
+			lastElemLeft = elemLeft;
+			lastElemTop = elemTop;
+			offsetLeft = 0;
+		}
         if ( elemBottom >= winTop && elemTop <= winBottom) {
             hintElems.push(elem);
             setHighlight(elem, false);
@@ -271,7 +329,9 @@ function removeHints() {
 function addKeyBind( key, func, eve ){
     var pressedKey = getKey(eve);
     if( pressedKey == key ){
-        eve.preventDefault();
+        if(!allowPassthrough){
+			eve.preventDefault();
+		}
         func();
     }
 }
@@ -358,14 +418,11 @@ function unhighlight()
 			highlights[i].parentNode.replaceChild(the_text_node, highlights[i]);
 			if (i == find_pointer) selectElementContents(the_text_node);
 			parent_node.normalize();
-			//normalize(parent_node);
 		}
 	}
 	highlights = [];
 	find_pointer = -1;
 }
-
-
 
 function findNext()
 {
@@ -593,7 +650,7 @@ function inputText(command){
 		input.value = command;
 
 		var span = document.createElement('span');
-		span.id = "zsurf.location";
+		span.id = "zsurf-location";
 		span.innerHTML = window.location.href;
 		span.style.cssText = [
 			'right: 0px !important;',
@@ -679,48 +736,53 @@ function nextCommand(){
 
 function initKeyBind(e){
 
-    var t = e.target;
-    if( t.nodeType == 1){
-		if( textInputs.indexOf(document.activeElement.type) == -1 &&
-			document.activeElement.contentEditable != "true"){
-			addKeyBind( 'f', function(){hintMode();}, e );
-			addKeyBind( 'F', function(){hintMode(true);}, e );
-			addKeyBind( 'o', function(){inputText(":open ");}, e );
-			addKeyBind( 't', function(){inputText(":openTab ");}, e );
-			addKeyBind( 'r', function(){window.location.reload();}, e );
-			addKeyBind( ':', function(){inputText(":");}, e );
-			addKeyBind( 'y', function(){setClipboard(window.location);}, e );
+	if(!allowPassthrough){
+		var t = e.target;
+		if( t.nodeType == 1){
+			if( (textInputs.indexOf(document.activeElement.type) == -1 &&
+				document.activeElement.contentEditable != "true") ){
+				addKeyBind( 'f', function(){hintMode();}, e );
+				addKeyBind( 'F', function(){hintMode(true);}, e );
+				addKeyBind( 'o', function(){inputText(":open ");}, e );
+				addKeyBind( 't', function(){inputText(":openTab ");}, e );
+				addKeyBind( 'r', function(){window.location.reload();}, e );
+				addKeyBind( ':', function(){inputText(":");}, e );
+				addKeyBind( 'y', function(){setClipboard(window.location);}, e );
 
-			addKeyBind( 'j', function(){window.scrollBy(0,50);}, e );
-			addKeyBind( 'k', function(){window.scrollBy(0,-50);}, e );
-			addKeyBind( 'h', function(){window.scrollBy(-50,0);}, e );
-			addKeyBind( 'l', function(){window.scrollBy(50,0);}, e );
+				addKeyBind( 'j', function(){window.scrollBy(0,50);}, e );
+				addKeyBind( 'k', function(){window.scrollBy(0,-50);}, e );
+				addKeyBind( 'h', function(){window.scrollBy(-50,0);}, e );
+				addKeyBind( 'l', function(){window.scrollBy(50,0);}, e );
 
-			addKeyBind( 'H', function(){window.history.back();}, e );
-			addKeyBind( 'L', function(){window.history.forward();}, e );
+				addKeyBind( 'H', function(){window.history.back();}, e );
+				addKeyBind( 'L', function(){window.history.forward();}, e );
 
-			addKeyBind( 'g', function(){window.scrollTo(0,0);}, e );
-			addKeyBind( 'G', function(){window.scrollTo(0,document.body.scrollHeight);}, e );
+				addKeyBind( 'g', function(){window.scrollTo(0,0);}, e );
+				addKeyBind( 'G', function(){window.scrollTo(0,document.body.scrollHeight);}, e );
 
-			addKeyBind( 'U', function(){window.scrollBy(0,-window.innerHeight);}, e );
-			addKeyBind( 'D', function(){window.scrollBy(0,window.innerHeight);}, e );
+				addKeyBind( 'U', function(){window.scrollBy(0,-window.innerHeight);}, e );
+				addKeyBind( 'D', function(){window.scrollBy(0,window.innerHeight);}, e );
 
-			addKeyBind( 'I', function(){zoom(0.1);}, e );
-			addKeyBind( 'O', function(){zoom(-0.1);}, e );
+				addKeyBind( 'I', function(){zoom(0.1);}, e );
+				addKeyBind( 'O', function(){zoom(-0.1);}, e );
 
-			addKeyBind( 'Divide', function(){inputText(":search ");}, e );
-			addKeyBind( 'p', function(){findPrev();}, e );
-			addKeyBind( 'n', function(){findNext();}, e );
+				addKeyBind( 'Divide', function(){inputText(":search ");}, e );
+				addKeyBind( 'p', function(){findPrev();}, e );
+				addKeyBind( 'n', function(){findNext();}, e );
+
+			}
 		}
-    }
-	
-	var input = document.getElementById('zsurf-console');
-	if(document.activeElement == input){
-		addKeyBind( 'Up', function(){prevCommand();}, e );
-		addKeyBind( 'Down', function(){nextCommand();}, e );
-	}
+		
+		var input = document.getElementById('zsurf-console');
+		if(document.activeElement == input){
+			addKeyBind( 'Up', function(){prevCommand();}, e );
+			addKeyBind( 'Down', function(){nextCommand();}, e );
+		}
 
-	addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
+		addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
+
+	}
+	addKeyBind( 'Insert', function(){togglePassthrough();}, e );
 }
 
 var keyId = {

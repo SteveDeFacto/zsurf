@@ -47,6 +47,7 @@ long embed;
 long maxHistory;
 bool cacheEnabled;
 bool saveCookies;
+bool allowPopups;
 
 class ZNetworkCookieJar : public QNetworkCookieJar {
 
@@ -127,13 +128,19 @@ public :
     {
         Q_UNUSED(type);
 
-        QWebView *webView = new QWebView;
-        QWebPage *newWeb = new QWebPage(webView);
-        webView->setAttribute(Qt::WA_DeleteOnClose, true);
-        webView->setPage(newWeb);
-        webView->show();
+        if(allowPopups){
+            QWebView *webView = new QWebView;
+            QWebPage *newWeb = new QWebPage(webView);
+            webView->setAttribute(Qt::WA_DeleteOnClose, true);
+            webView->setPage(newWeb);
+            webView->show();
 
-        return webView;
+            return webView;
+        }
+        else
+        {
+            return NULL;
+        }
     }
 
 };
@@ -220,10 +227,8 @@ ZWebView* openWindow(QString url, bool visible)
     webView->history()->setMaximumItemCount(maxHistory);
 
     // Evaluate script every time page is loaded.
-    QObject::connect(webView->page()->mainFrame(), &QWebFrame::initialLayoutCompleted, [&]()
+    QObject::connect(webView->page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, [&]()
     {
-
-
         if(!cacheEnabled){
             QWebSettings::clearMemoryCaches();
         }
@@ -234,7 +239,6 @@ ZWebView* openWindow(QString url, bool visible)
         }
         qDebug() << "Scripts evaluated.";
     });
-
 
     // Bind inspector to key.
     QShortcut *inspectorShortcut = new QShortcut(QKeySequence("F12"), webView);
@@ -378,6 +382,16 @@ void loadConfig()
     // Load config
     QSettings settings(configPath, QSettings::IniFormat);
     qDebug() << "Config loaded:" << configPath;   
+
+    // Set popup policy
+    if(!settings.value("allow_popups").isNull())
+    {
+        allowPopups = settings.value("allow_popups").toInt();
+    } else
+    {
+        allowPopups = false;
+    }
+
 
     // Set max history
     if(!settings.value("max_history").isNull())
