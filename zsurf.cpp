@@ -131,6 +131,7 @@ public :
         if(allowPopups){
             QWebView *webView = new QWebView;
             QWebPage *newWeb = new QWebPage(webView);
+            newWeb->setNetworkAccessManager(manager);
             webView->setAttribute(Qt::WA_DeleteOnClose, true);
             webView->setPage(newWeb);
             webView->show();
