@@ -387,7 +387,7 @@ void loadConfig()
     // Set popup policy
     if(!settings.value("allow_popups").isNull())
     {
-        allowPopups = settings.value("allow_popups").toInt();
+        allowPopups = settings.value("allow_popups").toBool();
     } else
     {
         allowPopups = false;
