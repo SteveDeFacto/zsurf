@@ -26,6 +26,7 @@
 #include <QtWebKit/QWebFullScreenRequest>
 #include <QtWebKitWidgets/QWebInspector>
 #include <QtWebKitWidgets/QWebView>
+#include <QtWebKitWidgets/QWebPage>
 #include <QtWebKitWidgets/QWebFrame>
 
 QApplication* application;
@@ -121,6 +122,20 @@ public :
             QWebView::keyPressEvent(e);
         }
     }
+
+    QWebView* createWindow(QWebPage::WebWindowType type)
+    {
+        Q_UNUSED(type);
+
+        QWebView *webView = new QWebView;
+        QWebPage *newWeb = new QWebPage(webView);
+        webView->setAttribute(Qt::WA_DeleteOnClose, true);
+        webView->setPage(newWeb);
+        webView->show();
+
+        return webView;
+    }
+
 };
 
 QList<ZWebView*> webViews;
@@ -130,6 +145,13 @@ class ZWebPage : public QWebPage {
     QString userAgentForUrl(const QUrl &url ) const
     {
         return QString(userAgent);
+    }
+
+
+    bool acceptNavigationRequest(QWebFrame *frame, const QNetworkRequest &request, QWebPage::NavigationType type)
+    {
+        qDebug() << "navigation request was made";
+        return QWebPage::acceptNavigationRequest(frame, request, type);
     }
 };
 
@@ -284,6 +306,11 @@ ZWebView* openWindow(QString url, bool visible)
         }
     });
 
+    // Handle close window request
+    QObject::connect(webView->page(), &QWebPage::windowCloseRequested, [&](){
+        webView->close();
+    });
+
     if(!url.isEmpty())
     {
         // Load specified page.
@@ -325,6 +352,9 @@ ZWebView* openWindow(QString url, bool visible)
         webView->resize(1, 1);
         webView->resize(width, height);
     });
+
+
+    webView->setAttribute(Qt::WA_DeleteOnClose, true);
 
     return webView;
 }
@@ -454,10 +484,6 @@ void loadConfig()
         proxy.setType(QNetworkProxy::DefaultProxy);
     }
     QNetworkProxy::setApplicationProxy(proxy);
-
-
-
-
 
     // Performance Settings
     QWebSettings::globalSettings()->setAttribute(QWebSettings::LinksIncludedInFocusChain, settings.value("links_included_in_focus_chain").toBool());
