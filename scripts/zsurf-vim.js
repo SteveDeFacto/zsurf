@@ -21,7 +21,80 @@ var passthroughEvents = [];
 // Handle onwheel event
 window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
 
+
 document.addEventListener('DOMContentLoaded', function(event) {
+
+	var div = document.createElement('div');
+		div.id = "zsurf-panel";
+		div.style.cssText = [
+			'right: 0px !important;',
+			'left: 0px !important;',
+			'bottom: 0px !important;',
+			'height: 26px !important;',
+			'position: fixed !important;',
+			'color: white !important;',
+			'background-color: #000000c6 !important;',
+			'font-family: Arial, Helvetica, sans-serif !important;',
+			'font-style: normal !important;',
+			'font-size: 13px !important;',
+			'font-weight: bold !important;',
+			'border-top: 1px dashed gray !important;',
+			'z-index: 2147483647 !important;',
+			'margin: 0 !important;',
+			'padding: 0 !important;',
+		].join('');
+	div.show = function(){this.style.display = 'block';}
+	div.hide = function(){this.style.display = 'none';}
+
+	var input = document.createElement('input');
+	input.id = "zsurf-console";
+	input.type = "text";
+	input.addEventListener('keydown', parseCommand, true, true);
+
+	input.style.cssText = [ 
+		'left: 0px !important;',
+		'bottom: 0px !important;',
+		'width: 100% !important;',
+		'height: 26px !important;',
+		'position: fixed !important;',
+		'color: white !important;',
+		'background-color: transparent !important;',
+		'font-family: Arial, Helvetica, sans-serif !important;',
+		'font-style: normal !important;',
+		'font-size: 13px !important;',
+		'font-weight: bold !important;',
+		'outline: none !important;',
+		'border: 0 !important;',
+		'z-index: 2147483647 !important;',
+		'margin: 0 !important;',
+		'padding: 0 !important;',
+	].join('');
+
+	var span = document.createElement('span');
+	span.id = "zsurf-location";
+	span.innerHTML = window.location.href;
+	span.style.cssText = [
+		'right: 0px !important;',
+		'bottom: 0px !important;',
+		'height: 22px !important;',
+		'position: fixed !important;',
+		'color: lime !important;',
+		'font-family: Arial, Helvetica, sans-serif !important;',
+		'font-style: normal !important;',
+		'font-size: 13px !important;',
+		'font-weight: bold !important;',
+		'outline: none !important;',
+		'z-index: 2147483647 !important;',
+		'margin: 0px 10px 0px 0px !important;',
+		'padding: 0 !important;',
+		'line-height: 18px !important;',
+	].join('');
+
+	div.appendChild(span);
+	div.appendChild(input);
+
+	document.body.appendChild(div);
+
 	// Unfocus active textbox
 	unfocus();
 });
@@ -43,7 +116,9 @@ function addEventListenerExt(type, callback, capture){
 
 	if( (type != 'keydown' &&
 		type != 'keyup' &&
-		type != 'keypress') ||
+		type != 'keypress' &&
+		type != 'input' &&
+		type != 'change') ||
 		callback == parseCommand){
 		return oldAddEventListener.apply(this, arguments);
 	} else if(!allowPassthrough){
@@ -152,7 +227,6 @@ function hintMode(newtab){
 }
 
 function hintHandler(e){
-	e.preventDefault ? e.preventDefault() : e.returnValue = false;
     var pressedKey = getKey(e);
     if (pressedKey == 'Enter') {
         if (hintNumStr == '')
@@ -174,6 +248,9 @@ function hintHandler(e){
             }
         }
     }
+	e.preventDefault();
+	e.stopPropagation();
+	e.stopImmediatePropagation();
 }
 
 function setHighlight(elem, isActive) {
@@ -329,9 +406,6 @@ function removeHints() {
 function addKeyBind( key, func, eve ){
     var pressedKey = getKey(eve);
     if( pressedKey == key ){
-        if(!allowPassthrough){
-			eve.preventDefault();
-		}
         func();
     }
 }
@@ -555,7 +629,7 @@ function getStyle(el,styleProp)
 function parseCommand(e){
 	if(e.keyCode == 13) {
 
-		var div = document.getElementById('zsurf-panel');
+		var panel = document.getElementById('zsurf-panel');
 		var input = document.getElementById('zsurf-console');
 		commandHistory.push(input.value);
 
@@ -565,23 +639,23 @@ function parseCommand(e){
 			commandTokens.shift();
 			var url = commandTokens.join(' ');
 			openUrl(url, false);
-			div.remove();
+			panel.hide();
 			return;
 		} else if( commandTokens[0] === ':search' ){
 			commandTokens.shift();
 			var search = commandTokens.join(' ');
 			find(search);
-			div.remove();
+			panel.hide();
 			return;
 		} else if( commandTokens[0] === ':openTab' ){
 			commandTokens.shift();
 			var url = commandTokens.join(' ');
 			openUrl(url, true);
-			div.remove();
+			panel.hide();
 			return;
 		} else if( commandTokens[0] === ':q' ){
 			window.close();
-			div.remove();
+			panel.hide();
 			return;
 		}
 
@@ -594,99 +668,28 @@ function parseCommand(e){
 		}
 
 		if(input.value.length == 1){
-			document.getElementById('zsurf-panel').remove();
+			input.blur();
 			return;
 		}
 	}
+
+	e.stopPropagation();
+	e.stopImmediatePropagation();
 } 
 
 function inputText(command){
-
+	var panel = document.getElementById('zsurf-panel');
+	panel.show();
 	var console = document.getElementById('zsurf-console');
-	if(console == null) {
-		var div = document.createElement('div');
-		div.id = "zsurf-panel";
-		div.style.cssText = [
-			'right: 0px !important;',
-			'left: 0px !important;',
-			'bottom: 0px !important;',
-			'height: 26px !important;',
-			'position: fixed !important;',
-			'color: white !important;',
-			'background-color: #000000c6 !important;',
-			'font-family: Arial, Helvetica, sans-serif !important;',
-			'font-style: normal !important;',
-			'font-size: 13px !important;',
-			'font-weight: bold !important;',
-			'border-top: 1px dashed gray !important;',
-			'z-index: 2147483647 !important;',
-			'margin: 0 !important;',
-			'padding: 0 !important;',
-		].join('');
-
-		var input = document.createElement('input');
-		input.id = "zsurf-console";
-		input.type = "text";
-		input.addEventListener('keydown', parseCommand);
-		input.style.cssText = [ 
-			'left: 0px !important;',
-			'bottom: 0px !important;',
-			'width: 100% !important;',
-			'height: 26px !important;',
-			'position: fixed !important;',
-			'color: white !important;',
-			'background-color: transparent !important;',
-			'font-family: Arial, Helvetica, sans-serif !important;',
-			'font-style: normal !important;',
-			'font-size: 13px !important;',
-			'font-weight: bold !important;',
-			'outline: none !important;',
-			'border: 0 !important;',
-			'z-index: 2147483647 !important;',
-			'margin: 0 !important;',
-			'padding: 0 !important;',
-		].join('');
-
-		input.value = command;
-
-		var span = document.createElement('span');
-		span.id = "zsurf-location";
-		span.innerHTML = window.location.href;
-		span.style.cssText = [
-			'right: 0px !important;',
-			'bottom: 0px !important;',
-			'height: 22px !important;',
-			'position: fixed !important;',
-			'color: lime !important;',
-			'font-family: Arial, Helvetica, sans-serif !important;',
-			'font-style: normal !important;',
-			'font-size: 13px !important;',
-			'font-weight: bold !important;',
-			'outline: none !important;',
-			'z-index: 2147483647 !important;',
-			'margin: 0px 10px 0px 0px !important;',
-			'padding: 0 !important;',
-			'line-height: 18px !important;',
-		].join('');
-
-		div.appendChild(span);
-		div.appendChild(input);
-
-		document.body.appendChild(div);
-		input.focus();
-	} else {
-		console.value = command;
-		console.focus();
-	}
+	console.value = command;
+	console.focus();
 }
 
 function unfocus(){
 	removeHints()
 	if(document.activeElement != null){
-		var console = document.querySelector("#zsurf-panel");
-		if(console != null){
-			console.remove();
-		}
+		var panel = document.querySelector("#zsurf-panel");
+		panel.hide();
 		setTimeout(function(){
 			document.activeElement.blur();
 		}, 1);
@@ -770,6 +773,9 @@ function initKeyBind(e){
 				addKeyBind( 'p', function(){findPrev();}, e );
 				addKeyBind( 'n', function(){findNext();}, e );
 
+				e.preventDefault();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
 			}
 		}
 		
@@ -867,6 +873,7 @@ var keyId = {
 }
 
 function getKey(evt){
+
     var key = keyId[evt.keyIdentifier] || evt.keyIdentifier,
         ctrl = evt.ctrlKey ? 'C-' : '',
         meta = (evt.metaKey || evt.altKey) ? 'M-' : '',
