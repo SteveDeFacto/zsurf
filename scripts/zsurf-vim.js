@@ -22,8 +22,14 @@ var clickableElems = [];
 // Handle onwheel event
 window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
 
-
 document.addEventListener('DOMContentLoaded', function(event) {
+
+	var storedZoomLevel = localStorage.getItem('zoomLevel');
+
+	if(storedZoomLevel != null){
+		zoomLevel = storedZoomLevel;
+		document.body.style.zoom = zoomLevel;
+	}
 
 	var div = document.createElement('div');
 		div.id = "zsurf-panel";
@@ -310,8 +316,12 @@ function execSelect(elem) {
         setHighlight(elem, true);
         if (hintOpenInNewTab) {
             window.open(elem.href);
-		} else {
+		} else if(elem.href.indexOf('javascript:') == -1 &&
+				elem.href.indexOf('#') == -1 &&
+				elem.href.length != 0){
 			location.href = elem.href;
+		} else {
+			console.log('click element');
 			elem.click();
 		}
     } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset")) {
@@ -745,6 +755,7 @@ function getClipboard(text){
 function zoom(step){
 	zoomLevel = Math.min(Math.max(zoomLevel + step, 0.2), 5);
 	document.body.style.zoom = zoomLevel;
+	localStorage.setItem('zoomLevel', zoomLevel);
 }
 
 
@@ -777,7 +788,8 @@ function initKeyBind(e){
 				addKeyBind( 'F', function(){hintMode(true);}, e );
 				addKeyBind( 'o', function(){inputText(":open ");}, e );
 				addKeyBind( 't', function(){inputText(":openTab ");}, e );
-				addKeyBind( 'r', function(){window.location.reload();}, e );
+				addKeyBind( 'r', function(){window.location.reload(false);}, e );
+				addKeyBind( 'R', function(){window.location.reload(true);}, e );
 				addKeyBind( ':', function(){inputText(":");}, e );
 				addKeyBind( 'y', function(){setClipboard(window.location);}, e );
 

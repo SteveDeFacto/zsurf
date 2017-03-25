@@ -110,24 +110,13 @@ public :
     }
 };
 
-
-
 // Extend QWebPage to set user agent.
 class ZWebPage : public QWebPage {
     QString userAgentForUrl(const QUrl &url ) const
     {
         return QString(userAgent);
     }
-
-/*
-    bool acceptNavigationRequest(QWebFrame *frame, const QNetworkRequest &request, QWebPage::NavigationType type)
-    {
-        qDebug() << "navigation request was made";
-        return QWebPage::acceptNavigationRequest(frame, request, type);
-    }
-    */
 };
-
 
 // Extend QWebView to break fullscreen on Esc.
 class ZWebView : public QWebView {
@@ -269,16 +258,15 @@ public :
         page()->mainFrame()->setScrollBarPolicy(Qt::Vertical,Qt::ScrollBarAlwaysOff);
 
         // Work around for resize bug.
-        /*
-        QTimer::singleShot(1000, application, []()
-        {
-            int oldWidth = width();
-            int oldHeight = height();
-            resize(1, 1);
-            resize(oldWidth, oldHeight);
-        });
-        */
-
+        if(webViews.length() == 0){
+            QTimer::singleShot(1000, application, [this]()
+            {
+                int oldWidth = width();
+                int oldHeight = height();
+                resize(1, 1);
+                resize(oldWidth, oldHeight);
+            });
+        }
         setAttribute(Qt::WA_DeleteOnClose, true);
 
         webViews.push_back(this);
@@ -315,9 +303,13 @@ public :
         }
     }
 
+    void closeEvent(QCloseEvent *event){
+        qDebug() << "Close window";
+        webViews.removeOne(this);
+        delete this;
+    }
+
 };
-
-
 
 // Function to load javascripts.
 void loadScripts()
