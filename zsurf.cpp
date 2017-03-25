@@ -144,7 +144,7 @@ public :
 
         setPage(webPage);
 
-        //history()->setMaximumItemCount(maxHistory);
+        history()->setMaximumItemCount(maxHistory);
 
         // Evaluate script every time page is loaded.
         QObject::connect(page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, [&]()
@@ -285,9 +285,7 @@ public :
 
     }
 
-    ZWebView(){
-        ZWebView("", true);
-    }
+    ZWebView() : ZWebView("", true) {}
 
     void keyPressEvent(QKeyEvent* e)
     {
@@ -300,12 +298,12 @@ public :
         }
     }
 
-    QWebView* createWindow(QWebPage::WebWindowType type)
+    ZWebView* createWindow(QWebPage::WebWindowType type)
     {
         Q_UNUSED(type);
 
         if(allowPopups){
-            QWebView* webView = new ZWebView();
+            ZWebView* webView = new ZWebView();
 
         qDebug() << "New window";
             return webView;
