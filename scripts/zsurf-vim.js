@@ -17,6 +17,7 @@ var oldAddEventListener = null;
 var oldRemoveEventListener = null;
 var allowPassthrough = false;
 var passthroughEvents = [];
+var clickableElems = [];
 
 // Handle onwheel event
 window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
@@ -114,14 +115,26 @@ function addEventListenerExt(type, callback, capture){
 		eventListeners[this].push(type);
 	}
 
+	
 	if( (type != 'keydown' &&
 		type != 'keyup' &&
-		type != 'keypress' &&
-		type != 'input' &&
-		type != 'change') ||
+		type != 'keypress') ||
 		callback == parseCommand){
+		if( type == 'click' ||
+			type == 'dblclick' ||
+			type == 'mouseenter' ||
+			type == 'mouseleave' ||
+			type == 'mouseover' ||
+			type == 'mousedown' ||
+			type == 'mousemove' ||
+			type == 'mouseout' ||
+			type == 'mouseup'){
+			clickableElems.push(this);
+		}
+
 		return oldAddEventListener.apply(this, arguments);
 	} else if(!allowPassthrough){
+		
 		passthroughEvents.push({
 			"element" : this,
 			"type" : type,
@@ -324,8 +337,19 @@ function setHints() {
     var winRight = winLeft + (window.innerWidth/zoomLevel);
 	var lastElemLeft = 0;
 	var lastElemTop = 0;
-	var offsetLeft = 0;
-    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], textarea, select, button, [onclick], [data-ui-tracking-context]');
+	var offset = 0;
+
+	// Query elements which can be clicked
+    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], [role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], [role=button], textarea, select, button, [onclick], [onfocus], [data-ui-tracking-context]');
+
+	// Add list of click elements we collected from event listeners
+	elems = clickableElems.concat(Array.from(elems));
+
+	// Remove duplicates
+	elems = elems.filter(function(item, pos, self) {
+    	return self.indexOf(item) == pos;
+	})
+
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
     document.body.appendChild(div);
@@ -339,12 +363,13 @@ function setHints() {
         var elemLeft = winLeft + pos.left;
         var elemRight = winLeft + pos.left;
 		if(elemLeft == lastElemLeft && elemTop ==lastElemTop){
-			offsetLeft += 20;
-			elemLeft += offsetLeft;
+			offset += 20;
+			elemLeft += offset;
+			elemTop += offset;
 		} else {
 			lastElemLeft = elemLeft;
 			lastElemTop = elemTop;
-			offsetLeft = 0;
+			offset = 0;
 		}
         if ( elemBottom >= winTop && elemTop <= winBottom) {
             hintElems.push(elem);
@@ -354,7 +379,7 @@ function setHints() {
                 'left: ', elemLeft, 'px !important;',
                 'top: ', elemTop, 'px !important;',
                 'position: absolute !important;',
-                'background-color: ' + (hintOpenInNewTab ? '#ff6600' : '#ff0000c0') + ' !important;',
+                'background-color: ' + (hintOpenInNewTab ? '#ff6600' : '#ff0000a0') + ' !important;',
 				'border: 1px solid white !important;',
 				'text-shadow: 1px 1px #000000 !important;',
                 'color: white !important;',
@@ -572,11 +597,11 @@ function scrollToPosition(field)
 
    if (field)
    {
-	   var theElement = field;  
-	   var elemPosX = theElement.offsetLeft;  
-	   var elemPosY = theElement.offsetTop;  
-	   theElement = theElement.offsetParent;  
-	   	while(theElement != null)
+		var theElement = field;  
+		var elemPosX = theElement.offsetLeft;  
+		var elemPosY = theElement.offsetTop;  
+		theElement = theElement.offsetParent;  
+		while(theElement != null)
 	   	{  
 			elemPosX += theElement.offsetLeft   
 			elemPosY += theElement.offsetTop;  
@@ -639,22 +664,26 @@ function parseCommand(e){
 			commandTokens.shift();
 			var url = commandTokens.join(' ');
 			openUrl(url, false);
+			input.blur();
 			panel.hide();
 			return;
 		} else if( commandTokens[0] === ':search' ){
 			commandTokens.shift();
 			var search = commandTokens.join(' ');
 			find(search);
+			input.blur();
 			panel.hide();
 			return;
 		} else if( commandTokens[0] === ':openTab' ){
 			commandTokens.shift();
 			var url = commandTokens.join(' ');
 			openUrl(url, true);
+			input.blur();
 			panel.hide();
 			return;
 		} else if( commandTokens[0] === ':q' ){
 			window.close();
+			input.blur();
 			panel.hide();
 			return;
 		}
@@ -774,8 +803,8 @@ function initKeyBind(e){
 				addKeyBind( 'n', function(){findNext();}, e );
 
 				e.preventDefault();
-				e.stopPropagation();
-				e.stopImmediatePropagation();
+				//e.stopPropagation();
+				//e.stopImmediatePropagation();
 			}
 		}
 		

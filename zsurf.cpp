@@ -29,12 +29,15 @@
 #include <QtWebKitWidgets/QWebPage>
 #include <QtWebKitWidgets/QWebFrame>
 
+class ZWebView;
+
 QApplication* application;
 QNetworkAccessManager* manager;
 QWebInspector* inspector;
 QFileSystemWatcher* watcher;
 QNetworkDiskCache* cache;
 
+QList<ZWebView*> webViews;
 QList<QString> requireList;
 QList<QString> scriptList;
 QString configPath;
@@ -107,11 +110,184 @@ public :
     }
 };
 
+
+
+// Extend QWebPage to set user agent.
+class ZWebPage : public QWebPage {
+    QString userAgentForUrl(const QUrl &url ) const
+    {
+        return QString(userAgent);
+    }
+
+/*
+    bool acceptNavigationRequest(QWebFrame *frame, const QNetworkRequest &request, QWebPage::NavigationType type)
+    {
+        qDebug() << "navigation request was made";
+        return QWebPage::acceptNavigationRequest(frame, request, type);
+    }
+    */
+};
+
+
 // Extend QWebView to break fullscreen on Esc.
 class ZWebView : public QWebView {
 
 public :
     Qt::WindowStates prevWindowState;
+
+    ZWebView(QString url, bool visible)
+    {
+
+        ZWebPage* webPage = new ZWebPage();
+
+        webPage->setNetworkAccessManager(manager);
+
+        setPage(webPage);
+
+        //history()->setMaximumItemCount(maxHistory);
+
+        // Evaluate script every time page is loaded.
+        QObject::connect(page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, [&]()
+        {
+            if(!cacheEnabled){
+                QWebSettings::clearMemoryCaches();
+            }
+
+            for(int i = 0; i < scriptList.size(); i++)
+            {
+                page()->mainFrame()->evaluateJavaScript(scriptList[i]);
+            }
+            qDebug() << "Scripts evaluated.";
+        });
+
+        // Bind inspector to key.
+        QShortcut *inspectorShortcut = new QShortcut(QKeySequence("F12"), this);
+        QObject::connect(inspectorShortcut, &QShortcut::activated, [&]()
+        {
+            if(inspector == NULL)
+            {
+                QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
+                inspector = new QWebInspector();
+                inspector->setPage(page());
+                inspector->adjustSize();
+                inspector->setVisible(true);
+            } else
+            {
+                QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, false);
+                inspector->setVisible(false);
+                inspector->deleteLater();
+                inspector = NULL;
+            }
+        });
+
+        // Handle fullscreen request
+        QObject::connect(page(), &QWebPage::fullScreenRequested, [&](QWebFullScreenRequest request)
+        {
+            qDebug() << "Fullscreen request.";
+            request.accept();
+            if(request.toggleOn()){
+                prevWindowState = windowState();
+                showFullScreen();
+            } else {
+                setWindowState(prevWindowState);
+            }
+        });
+
+        // Handle feature request
+        QObject::connect(page(), &QWebPage::featurePermissionRequested, [&](QWebFrame* frame, QWebPage::Feature feature){
+            qDebug() << "Accepted feature request.";
+            page()->setFeaturePermission(frame, feature, QWebPage::PermissionGrantedByUser);
+        });
+
+        // Handle download request
+        QObject::connect(page(), &QWebPage::downloadRequested, [&](QNetworkRequest request)
+        {
+            qDebug() << "Download requested.";
+            QString fileName = QFileDialog::getSaveFileName(this, "Save File", downloadPath + request.url().fileName());
+
+            if(fileName != ""){
+                manager->get(request);
+                QObject::connect(manager, &QNetworkAccessManager::finished, [&,fileName](QNetworkReply* reply)
+                {
+                    QFile file(fileName);
+                    if(file.open(QIODevice::WriteOnly))
+                    {
+                        QDataStream out(&file);
+                        out.writeRawData(reply->readAll(), reply->size());
+
+                        qDebug() << "Download Complete: " << fileName;
+                        QMessageBox msgBox;
+                        msgBox.setText("Download Complete: " + fileName);
+                        msgBox.show();
+                    } else
+                    {
+                        qDebug() << "Download Failed: " << fileName;
+                        QMessageBox msgBox;
+                        msgBox.setText("Download Failed: " + fileName);
+                        msgBox.show();
+                    }
+                });
+            }
+        });
+
+        // Handle close window request
+        QObject::connect(page(), &QWebPage::windowCloseRequested, [&](){
+            close();
+        });
+
+        if(!url.isEmpty())
+        {
+            // Load specified page.
+            load(QUrl(url));
+        } else
+        {
+            // Evaluate scripts
+            for(int i = 0; i < scriptList.size(); i++)
+            {
+                page()->mainFrame()->evaluateJavaScript(scriptList[i]);
+            }
+        }
+
+        // Display window
+        if(embed)
+        {
+            QWidget* widget = QWidget::createWindowContainer(QWindow::fromWinId(embed));
+            setParent(widget);
+
+            if(visible)
+            {
+                widget->show();
+            }
+
+        } else if(visible)
+        {
+            show();
+        }
+
+        // Disable scrollbars
+        page()->mainFrame()->setScrollBarPolicy(Qt::Horizontal,Qt::ScrollBarAlwaysOff);
+        page()->mainFrame()->setScrollBarPolicy(Qt::Vertical,Qt::ScrollBarAlwaysOff);
+
+        // Work around for resize bug.
+        /*
+        QTimer::singleShot(1000, application, []()
+        {
+            int oldWidth = width();
+            int oldHeight = height();
+            resize(1, 1);
+            resize(oldWidth, oldHeight);
+        });
+        */
+
+        setAttribute(Qt::WA_DeleteOnClose, true);
+
+        webViews.push_back(this);
+
+    }
+
+    ZWebView(){
+        ZWebView("", true);
+    }
 
     void keyPressEvent(QKeyEvent* e)
     {
@@ -129,14 +305,11 @@ public :
         Q_UNUSED(type);
 
         if(allowPopups){
-            QWebView *webView = new QWebView;
-            QWebPage *newWeb = new QWebPage(webView);
-            newWeb->setNetworkAccessManager(manager);
-            webView->setAttribute(Qt::WA_DeleteOnClose, true);
-            webView->setPage(newWeb);
-            webView->show();
+            QWebView* webView = new ZWebView();
 
+        qDebug() << "New window";
             return webView;
+
         }
         else
         {
@@ -146,22 +319,7 @@ public :
 
 };
 
-QList<ZWebView*> webViews;
 
-// Extend QWebPage to set user agent.
-class ZWebPage : public QWebPage {
-    QString userAgentForUrl(const QUrl &url ) const
-    {
-        return QString(userAgent);
-    }
-
-
-    bool acceptNavigationRequest(QWebFrame *frame, const QNetworkRequest &request, QWebPage::NavigationType type)
-    {
-        qDebug() << "navigation request was made";
-        return QWebPage::acceptNavigationRequest(frame, request, type);
-    }
-};
 
 // Function to load javascripts.
 void loadScripts()
@@ -213,156 +371,7 @@ void liveReload()
 }
 
 // Method to open a Window.
-ZWebView* openWindow(QString url, bool visible)
-{
 
-    // Initialize and show QWebView.
-    ZWebView* webView = new ZWebView();
-
-    ZWebPage* webPage = new ZWebPage();
-
-    webPage->setNetworkAccessManager(manager);
-
-    webView->setPage(webPage);
-
-    webView->history()->setMaximumItemCount(maxHistory);
-
-    // Evaluate script every time page is loaded.
-    QObject::connect(webView->page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, [&]()
-    {
-        if(!cacheEnabled){
-            QWebSettings::clearMemoryCaches();
-        }
-
-        for(int i = 0; i < scriptList.size(); i++)
-        {
-            webView->page()->mainFrame()->evaluateJavaScript(scriptList[i]);
-        }
-        qDebug() << "Scripts evaluated.";
-    });
-
-    // Bind inspector to key.
-    QShortcut *inspectorShortcut = new QShortcut(QKeySequence("F12"), webView);
-    webView->connect(inspectorShortcut, &QShortcut::activated, [&]()
-    {
-        if(inspector == NULL)
-        {
-            QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
-            inspector = new QWebInspector();
-            inspector->setPage(webView->page());
-            inspector->adjustSize();
-            inspector->setVisible(true);
-        } else
-        {
-            QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, false);
-            inspector->setVisible(false);
-            inspector->deleteLater();
-            inspector = NULL;
-        }
-    });
-
-    // Handle fullscreen request
-    QObject::connect(webView->page(), &QWebPage::fullScreenRequested, [&](QWebFullScreenRequest request)
-    {
-        qDebug() << "Fullscreen request.";
-        request.accept();
-        if(request.toggleOn()){
-            webView->prevWindowState = webView->windowState();
-            webView->showFullScreen();
-        } else {
-            webView->setWindowState(webView->prevWindowState);
-        }
-    });
-
-    // Handle feature request
-    QObject::connect(webView->page(), &QWebPage::featurePermissionRequested, [&](QWebFrame* frame, QWebPage::Feature feature){
-        qDebug() << "Accepted feature request.";
-        webView->page()->setFeaturePermission(frame, feature, QWebPage::PermissionGrantedByUser);
-    });
-
-    // Handle download request
-    QObject::connect(webView->page(), &QWebPage::downloadRequested, [&](QNetworkRequest request)
-    {
-        qDebug() << "Download requested.";
-        QString fileName = QFileDialog::getSaveFileName(webView, "Save File", downloadPath + request.url().fileName());
-
-        if(fileName != ""){
-            manager->get(request);
-            QObject::connect(manager, &QNetworkAccessManager::finished, [&,fileName](QNetworkReply* reply)
-            {
-                QFile file(fileName);
-                if(file.open(QIODevice::WriteOnly))
-                {
-                    QDataStream out(&file);
-                    out.writeRawData(reply->readAll(), reply->size()); 
-
-                    qDebug() << "Download Complete: " << fileName;
-                    QMessageBox msgBox;
-                    msgBox.setText("Download Complete: " + fileName);
-                    msgBox.show();
-                } else
-                {
-                    qDebug() << "Download Failed: " << fileName;
-                    QMessageBox msgBox;
-                    msgBox.setText("Download Failed: " + fileName);
-                    msgBox.show();
-                }
-            });
-        }
-    });
-
-    // Handle close window request
-    QObject::connect(webView->page(), &QWebPage::windowCloseRequested, [&](){
-        webView->close();
-    });
-
-    if(!url.isEmpty())
-    {
-        // Load specified page.
-        webView->load(QUrl(url));
-    } else
-    {
-        // Evaluate scripts
-        for(int i = 0; i < scriptList.size(); i++)
-        {
-            webView->page()->mainFrame()->evaluateJavaScript(scriptList[i]);
-        }
-    }
-
-    // Display window
-    if(embed)
-    {
-        QWidget* widget = QWidget::createWindowContainer(QWindow::fromWinId(embed));
-        webView->setParent(widget);
-
-        if(visible)
-        {
-            widget->show();
-        }
-
-    } else if(visible)
-    {
-        webView->show();
-    }
-
-    // Disable scrollbars
-    webView->page()->mainFrame()->setScrollBarPolicy(Qt::Horizontal,Qt::ScrollBarAlwaysOff);
-    webView->page()->mainFrame()->setScrollBarPolicy(Qt::Vertical,Qt::ScrollBarAlwaysOff);
-
-    // Work around for resize bug.
-    QTimer::singleShot(1000, application, [webView]()
-    {
-        int width = webView->width();
-        int height = webView->height();
-        webView->resize(1, 1);
-        webView->resize(width, height);
-    });
-
-
-    webView->setAttribute(Qt::WA_DeleteOnClose, true);
-
-    return webView;
-}
 
 // Load configuration settings.
 void loadConfig()
@@ -567,7 +576,7 @@ int main(int argc, char* argv[])
     liveReload();
 
     // Open primary web view.
-    webViews.push_back( openWindow(homePage, true) );
+    new ZWebView(homePage, true);
 
     // Return exit status.
     return application->exec();
