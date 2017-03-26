@@ -23,14 +23,33 @@ var clickableElems = [];
 window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
 
 document.addEventListener('DOMContentLoaded', function(event) {
-
 	var storedZoomLevel = localStorage.getItem('zoomLevel');
 
-	if(storedZoomLevel != null){
-		zoomLevel = storedZoomLevel;
+	//alert(storedZoomLevel);
+	if(!isNaN(storedZoomLevel) && storedZoomLevel != null){
+		zoomLevel = number(storedZoomLevel);
 		document.body.style.zoom = zoomLevel;
 	}
 
+	// Create GUI
+	createGui();
+
+	// Unfocus active textbox
+	unfocus();
+});
+
+document.addEventListener('keydown', initKeyBind, true, true);
+
+// Intercept all calls to addEventListener or removeEventListener.
+oldAddEventListener = HTMLElement.prototype.addEventListener;
+oldRemoveEventListener = HTMLElement.prototype.removeEventListener;
+HTMLElement.prototype.addEventListener = addEventListenerExt;
+HTMLElement.prototype.removeEventListener = removeEventListenerExt;
+
+function createGui(){
+	var panel = document.getElementById('zsurf-panel');
+
+	if(panel == null){
 	var div = document.createElement('div');
 		div.id = "zsurf-panel";
 		div.style.cssText = [
@@ -50,7 +69,9 @@ document.addEventListener('DOMContentLoaded', function(event) {
 			'margin: 0 !important;',
 			'padding: 0 !important;',
 		].join('');
-	div.show = function(){this.style.display = 'block';}
+	div.show = function(){	
+		this.style.display = 'block';
+	}
 	div.hide = function(){this.style.display = 'none';}
 
 	var input = document.createElement('input');
@@ -102,17 +123,11 @@ document.addEventListener('DOMContentLoaded', function(event) {
 
 	document.body.appendChild(div);
 
-	// Unfocus active textbox
-	unfocus();
-});
-
-document.addEventListener('keydown', initKeyBind, true, true);
-
-// Intercept all calls to addEventListener or removeEventListener.
-oldAddEventListener = HTMLElement.prototype.addEventListener;
-oldRemoveEventListener = HTMLElement.prototype.removeEventListener;
-HTMLElement.prototype.addEventListener = addEventListenerExt;
-HTMLElement.prototype.removeEventListener = removeEventListenerExt;
+	return div;
+	} else {
+		return panel;
+	}
+}
 
 function addEventListenerExt(type, callback, capture){
 	if(eventListeners[this] == undefined) {
@@ -717,7 +732,7 @@ function parseCommand(e){
 } 
 
 function inputText(command){
-	var panel = document.getElementById('zsurf-panel');
+	var panel = createGui();
 	panel.show();
 	var console = document.getElementById('zsurf-console');
 	console.value = command;
@@ -789,7 +804,7 @@ function initKeyBind(e){
 				addKeyBind( 'o', function(){inputText(":open ");}, e );
 				addKeyBind( 't', function(){inputText(":openTab ");}, e );
 				addKeyBind( 'r', function(){window.location.reload(false);}, e );
-				addKeyBind( 'R', function(){window.location.reload(true);}, e );
+				addKeyBind( 'R', function(){alert(zoomLevel);}, e );
 				addKeyBind( ':', function(){inputText(":");}, e );
 				addKeyBind( 'y', function(){setClipboard(window.location);}, e );
 
