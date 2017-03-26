@@ -488,7 +488,7 @@ function openUrl(url, newTab){
 	}
 }
 
-function find(word, node)
+function findText(word, node)
 {
 	if (!node){
 		unhighlight();
@@ -532,7 +532,7 @@ function find(word, node)
 				if (node.nodeType == 1 && !getStyle(node, "visibility").match(/hidden/i) &&
 					node.nodeType == 1 && !getStyle(node, "display").match(/none/i))
 				{
-					find(word, node);
+					findText(word, node);
 				}
 			}
 		}
@@ -705,7 +705,7 @@ function parseCommand(e){
 		} else if( commandTokens[0] === ':search' ){
 			commandTokens.shift();
 			var search = commandTokens.join(' ');
-			find(search);
+			findText(search);
 			input.blur();
 			panel.hide();
 			return;
