@@ -20,14 +20,14 @@ var passthroughEvents = [];
 var clickableElems = [];
 
 // Handle onwheel event
-window.onwheel = function(e){window.scrollBy(0, -e.wheelDelta); return false; }
+window.onwheel = function(e){removeHints(); window.scrollBy(0, -e.wheelDelta); return false; }
 
 document.addEventListener('DOMContentLoaded', function(event) {
 	var storedZoomLevel = localStorage.getItem('zoomLevel');
 
 	//alert(storedZoomLevel);
 	if(!isNaN(storedZoomLevel) && storedZoomLevel != null){
-		zoomLevel = number(storedZoomLevel);
+		zoomLevel = Number(storedZoomLevel);
 		document.body.style.zoom = zoomLevel;
 	}
 
@@ -299,19 +299,12 @@ function setHighlight(elem, isActive) {
 }
 
 function setHintRules() {
-    var ss = document.styleSheets[0];
-	if(ss != undefined) {
-    	ss.insertRule('a[highlight=hint_elem] {background-color: yellow !important}', 0);
-    	ss.insertRule('a[highlight=hint_active] {background-color: lime !important;}', 0);
-	}
+	document.head.innerHTML += '<style>a[highlight=hint_elem] {background-color: yellow !important;}a[highlight=hint_active] {background-color: lime !important;}</style>';
 }
 
 function deleteHintRules() {
-    var ss = document.styleSheets[0];
-	if(ss != undefined) {
-    	ss.deleteRule(0);
-    	ss.deleteRule(0);
-	}
+	document.head.innerHTML.replace('<style>a[highlight=hint_elem] {background-color: yellow !important;}a[highlight=hint_active] {background-color: lime !important;}</style>', '');
+
 }
 
 function judgeHintNum(hintNum) {
@@ -365,7 +358,7 @@ function setHints() {
 	var offset = 0;
 
 	// Query elements which can be clicked
-    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], [role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], [role=button], textarea, select, button, [onclick], [onfocus], [data-ui-tracking-context]');
+    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], [role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], [role=button], area, textarea, select, button, [onclick], [onfocus], [data-ui-tracking-context]');
 
 	// Add list of click elements we collected from event listeners
 	elems = clickableElems.concat(Array.from(elems));
@@ -382,11 +375,28 @@ function setHints() {
         var elem = elems[i];
         if (!isHintDisplay(elem))
             continue;
-        var pos = elem.getBoundingClientRect();
-        var elemTop = winTop + pos.top;
-        var elemBottom = winTop + pos.bottom;
-        var elemLeft = winLeft + pos.left;
-        var elemRight = winLeft + pos.left;
+	    var elemTop = winTop;
+        var elemBottom = winTop;
+        var elemLeft = winLeft;
+        var elemRight = winLeft;	
+		if(elem.tagName == 'AREA'){
+			var posArray = elem.coords.split(',');
+			if(posArray.length == 4){
+				var imgElem = document.body.querySelector('[usemap="#'+elem.parentNode.name+'"]');
+				elemLeft += Number(posArray[0]) + imgElem.getBoundingClientRect().left;
+				elemTop += Number(posArray[1]) + imgElem.getBoundingClientRect().top;
+				elemRight += Number(posArray[2]) + imgElem.getBoundingClientRect().left;
+				elemBottom += Number(posArray[3]) + imgElem.getBoundingClientRect().top;
+			}
+		} else {
+        	var pos = elem.getBoundingClientRect();
+			elemTop += pos.top;
+			elemBottom += pos.bottom;
+			elemLeft += pos.left;
+			elemRight += pos.left;
+		}
+		
+
 		if(elemLeft == lastElemLeft && elemTop ==lastElemTop){
 			offset += 20;
 			elemLeft += offset;
@@ -432,7 +442,7 @@ function setHints() {
 
 function isHintDisplay(elem) {
     var pos = elem.getBoundingClientRect();
-    return (pos.height != 0 && pos.width != 0);
+    return elem.tagName == 'AREA' || (pos.height != 0 && pos.width != 0);
 }
 
 function removeHints() {
@@ -797,14 +807,15 @@ function initKeyBind(e){
 	if(!allowPassthrough){
 		var t = e.target;
 		if( t.nodeType == 1){
-			if( (textInputs.indexOf(document.activeElement.type) == -1 &&
+			if( document.activeElement == null ||
+				(textInputs.indexOf(document.activeElement.type) == -1 &&
 				document.activeElement.contentEditable != "true") ){
 				addKeyBind( 'f', function(){hintMode();}, e );
 				addKeyBind( 'F', function(){hintMode(true);}, e );
 				addKeyBind( 'o', function(){inputText(":open ");}, e );
 				addKeyBind( 't', function(){inputText(":openTab ");}, e );
 				addKeyBind( 'r', function(){window.location.reload(false);}, e );
-				addKeyBind( 'R', function(){alert(zoomLevel);}, e );
+				addKeyBind( 'R', function(){window.location.reload(true);}, e );
 				addKeyBind( ':', function(){inputText(":");}, e );
 				addKeyBind( 'y', function(){setClipboard(window.location);}, e );
 
