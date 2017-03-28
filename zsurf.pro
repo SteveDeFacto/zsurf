@@ -1,8 +1,8 @@
 QMAKE_CXXFLAGS += -Ofast -flto -std=c++0x -mno-align-double
 
 QT += core
-QT += webkit
-QT += webkitwidgets
+QT += webengine
+QT += webenginewidgets
 
 TARGET = zsurf
 TEMPLATE = app
@@ -31,4 +31,9 @@ SOURCES = zsurf.cpp
 	scripts.path += /usr/share/zsurf/scripts/
 	scripts.files += ./scripts/*
 	INSTALLS += scripts
+
+    dictionaries.path += /usr/bin/qtwebengine_dictionaries/
+    dictionaries.files += ./dictionaries/*
+    INSTALLS += dictionaries
+
 }

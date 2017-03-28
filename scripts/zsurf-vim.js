@@ -22,20 +22,25 @@ var clickableElems = [];
 // Handle onwheel event
 window.onwheel = function(e){removeHints(); window.scrollBy(0, -e.wheelDelta); return false; }
 
+
 document.addEventListener('DOMContentLoaded', function(event) {
 	var storedZoomLevel = localStorage.getItem('zoomLevel');
 
-	//alert(storedZoomLevel);
 	if(!isNaN(storedZoomLevel) && storedZoomLevel != null){
 		zoomLevel = Number(storedZoomLevel);
 		document.body.style.zoom = zoomLevel;
 	}
-
+	var sheet = document.createElement('style');
+	sheet.id = 'zsurf-style';
+	sheet.type = 'text/css'
+	sheet.innerHTML = 'body {overflow: hidden;} ::-webkit-scrollbar{display:none;}';
+	document.body.appendChild(sheet);
 	// Create GUI
 	createGui();
 
 	// Unfocus active textbox
 	unfocus();
+
 });
 
 document.addEventListener('keydown', initKeyBind, true, true);
@@ -47,6 +52,7 @@ HTMLElement.prototype.addEventListener = addEventListenerExt;
 HTMLElement.prototype.removeEventListener = removeEventListenerExt;
 
 function createGui(){
+
 	var panel = document.getElementById('zsurf-panel');
 
 	if(panel == null){
@@ -59,7 +65,7 @@ function createGui(){
 			'height: 26px !important;',
 			'position: fixed !important;',
 			'color: white !important;',
-			'background-color: #000000c6 !important;',
+			'background-color: #000000 !important;',
 			'font-family: Arial, Helvetica, sans-serif !important;',
 			'font-style: normal !important;',
 			'font-size: 13px !important;',
@@ -100,7 +106,13 @@ function createGui(){
 
 	var span = document.createElement('span');
 	span.id = "zsurf-location";
-	span.innerHTML = window.location.href;
+
+	var splitUrl = window.location.href.split('/').filter(Boolean);
+	var shortUrl = window.location.href;
+	if(splitUrl.length > 3){
+		shortUrl = splitUrl[0] +'//'+ splitUrl[1] + '/../' + splitUrl[splitUrl.length - 1];
+	}
+	span.innerHTML = shortUrl;
 	span.style.cssText = [
 		'right: 0px !important;',
 		'bottom: 0px !important;',
@@ -112,6 +124,7 @@ function createGui(){
 		'font-size: 13px !important;',
 		'font-weight: bold !important;',
 		'outline: none !important;',
+		'overflow: hidden !important;',
 		'z-index: 2147483647 !important;',
 		'margin: 0px 10px 0px 0px !important;',
 		'padding: 0 !important;',
@@ -135,7 +148,6 @@ function addEventListenerExt(type, callback, capture){
 	} else {
 		eventListeners[this].push(type);
 	}
-
 	
 	if( (type != 'keydown' &&
 		type != 'keyup' &&
@@ -149,7 +161,8 @@ function addEventListenerExt(type, callback, capture){
 			type == 'mousedown' ||
 			type == 'mousemove' ||
 			type == 'mouseout' ||
-			type == 'mouseup'){
+			type == 'mouseup' ||
+			type == 'focus'){
 			clickableElems.push(this);
 		}
 
@@ -175,6 +188,7 @@ function removeEventListenerExt(type, callback, capture){
 			eventListeners[this].splice(type, i);
 		}
 	}
+
 
 	return oldRemoveEventListener.apply(this, arguments);
 }
@@ -261,7 +275,7 @@ function hintMode(newtab){
 }
 
 function hintHandler(e){
-    var pressedKey = getKey(e);
+    var pressedKey = e.key;
     if (pressedKey == 'Enter') {
         if (hintNumStr == '')
             hintNumStr = '1';
@@ -297,15 +311,34 @@ function setHighlight(elem, isActive) {
         elem.setAttribute('highlight', 'hint_elem');
     }
 }
-
 function setHintRules() {
-	document.head.innerHTML += '<style>a[highlight=hint_elem] {background-color: yellow !important;}a[highlight=hint_active] {background-color: lime !important;}</style>';
+	var sheet = document.createElement('style');
+	sheet.id = 'zsurf-highlight';
+	sheet.innerHTML = 'a[highlight=hint_elem] {background-color: yellow !important;}a[highlight=hint_active] {background-color: lime !important;}';
+	document.body.appendChild(sheet);
 }
 
 function deleteHintRules() {
-	document.head.innerHTML.replace('<style>a[highlight=hint_elem] {background-color: yellow !important;}a[highlight=hint_active] {background-color: lime !important;}</style>', '');
-
+	document.getElementById('zsurf-highlight').remove();
 }
+
+/*
+function setHintRules() {
+    var ss = document.styleSheets[0];
+	if(ss != undefined) {
+    	ss.insertRule('a[highlight=hint_elem] {background-color: yellow !important}', 0);
+    	ss.insertRule('a[highlight=hint_active] {background-color: lime !important;}', 0);
+	}
+}
+
+function deleteHintRules() {
+    var ss = document.styleSheets[0];
+	if(ss != undefined) {
+    	ss.deleteRule(0);
+    	ss.deleteRule(0);
+	}
+}
+*/
 
 function judgeHintNum(hintNum) {
     var hintElem = hintElems[hintNum - 1];
@@ -414,7 +447,7 @@ function setHints() {
                 'left: ', elemLeft, 'px !important;',
                 'top: ', elemTop, 'px !important;',
                 'position: absolute !important;',
-                'background-color: ' + (hintOpenInNewTab ? '#ff6600' : '#ff0000a0') + ' !important;',
+                'background-color: ' + (hintOpenInNewTab ? '#ff6600' : '#ff0000') + ' !important;',
 				'border: 1px solid white !important;',
 				'text-shadow: 1px 1px #000000 !important;',
                 'color: white !important;',
@@ -464,7 +497,7 @@ function removeHints() {
 }
 
 function addKeyBind( key, func, eve ){
-    var pressedKey = getKey(eve);
+    var pressedKey = eve.key;
     if( pressedKey == key ){
         func();
     }
@@ -836,13 +869,13 @@ function initKeyBind(e){
 				addKeyBind( 'I', function(){zoom(0.1);}, e );
 				addKeyBind( 'O', function(){zoom(-0.1);}, e );
 
-				addKeyBind( 'Divide', function(){inputText(":search ");}, e );
+				addKeyBind( '/', function(){inputText(":search ");}, e );
 				addKeyBind( 'p', function(){findPrev();}, e );
 				addKeyBind( 'n', function(){findNext();}, e );
 
 				e.preventDefault();
-				//e.stopPropagation();
-				//e.stopImmediatePropagation();
+				e.stopPropagation();
+				e.stopImmediatePropagation();
 			}
 		}
 		
@@ -852,113 +885,9 @@ function initKeyBind(e){
 			addKeyBind( 'Down', function(){nextCommand();}, e );
 		}
 
-		addKeyBind( 'Esc', function(){unfocus(); unhighlight();}, e );
+		addKeyBind( 'Escape', function(){unfocus(); unhighlight(); document.webkitCancelFullScreen();}, e );
 
 	}
 	addKeyBind( 'Insert', function(){togglePassthrough();}, e );
 }
 
-var keyId = {
-	"U+2190" : "Left",
-	"U+2191" : "Up",
-	"U+2192" : "Right",
-	"U+2193" : "Down",
-    "U+0008" : "BackSpace",
-    "U+0009" : "Tab",
-    "U+0018" : "Cancel",
-    "U+001B" : "Esc",
-    "U+0020" : "Space",
-    "U+007F" : "Delete",
-    "U+20AC" : "€",
-    "U+0021" : "!",
-    "U+0022" : "\"",
-    "U+0023" : "#",
-    "U+0024" : "$",
-    "U+0026" : "&",
-    "U+0027" : "'",
-    "U+0028" : "(",
-    "U+0029" : ")",
-    "U+002A" : "*",
-    "U+002B" : "+",
-    "U+002C" : ",",
-    "U+002D" : "-",
-    "U+002E" : ".",
-    "U+002F" : "/",
-    "U+0030" : "0",
-    "U+0031" : "1",
-    "U+0032" : "2",
-    "U+0033" : "3",
-    "U+0034" : "4",
-    "U+0035" : "5",
-    "U+0036" : "6",
-    "U+0037" : "7",
-    "U+0038" : "8",
-    "U+0039" : "9",
-    "U+003A" : ":",
-    "U+003B" : ";",
-    "U+003C" : "<",
-    "U+003D" : "=",
-    "U+003E" : ">",
-    "U+003F" : "?",
-    "U+0040" : "@",
-    "U+0041" : "a",
-    "U+0042" : "b",
-    "U+0043" : "c",
-    "U+0044" : "d",
-    "U+0045" : "e",
-    "U+0046" : "f",
-    "U+0047" : "g",
-    "U+0048" : "h",
-    "U+0049" : "i",
-    "U+004A" : "j",
-    "U+004B" : "k",
-    "U+004C" : "l",
-    "U+004D" : "m",
-    "U+004E" : "n",
-    "U+004F" : "o",
-    "U+0050" : "p",
-    "U+0051" : "q",
-    "U+0052" : "r",
-    "U+0053" : "s",
-    "U+0054" : "t",
-    "U+0055" : "u",
-    "U+0056" : "v",
-    "U+0057" : "w",
-    "U+0058" : "x",
-    "U+0059" : "y",
-    "U+005A" : "z",
-    "U+00DB" : "[",
-    "U+00DC" : "\\",
-    "U+00DD" : "]",
-    "U+005E" : "^",
-    "U+005F" : "_",
-    "U+0060" : "`",
-    "U+007B" : "{",
-    "U+007C" : "|",
-    "U+007D" : "}",
-    "U+00A1" : "¡",
-}
-
-function getKey(evt){
-
-    var key = keyId[evt.keyIdentifier] || evt.keyIdentifier,
-        ctrl = evt.ctrlKey ? 'C-' : '',
-        meta = (evt.metaKey || evt.altKey) ? 'M-' : '',
-        shift = evt.shiftKey ? 'S-' : '';
-    if (evt.shiftKey){
-        if (/^[a-z]$/.test(key)) 
-            return ctrl+meta+key.toUpperCase();
-        if (/^[0-9]$/.test(key)) {
-            switch(key) {
-                // TODO
-                case "4":
-                    key = "$";
-                break;
-            };
-            return key;
-        }
-        if (/^(Enter|Space|BackSpace|Tab|Esc|Home|End|Left|Right|Up|Down|PageUp|PageDown|F(\d\d?))$/.test(key)) 
-            return ctrl+meta+shift+key;
-    }
-    return ctrl+meta+key;
-}

@@ -3,13 +3,8 @@
 #include <QWidget>
 #include <QDataStream>
 #include <QFileSystemWatcher>
-#include <QNetworkAccessManager>
-#include <QNetworkReply>
 #include <QNetworkProxy>
 #include <QNetworkConfiguration>
-#include <QNetworkDiskCache>
-#include <QNetworkCookieJar>
-#include <QNetworkCookie>
 #include <QMessageBox>
 #include <QSettings>
 #include <QFileDialog>
@@ -21,160 +16,85 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QDir>
-#include <QtWebKit/QWebHistory>
-#include <QtWebKit/QWebElement>
-#include <QtWebKit/QWebFullScreenRequest>
-#include <QtWebKitWidgets/QWebInspector>
-#include <QtWebKitWidgets/QWebView>
-#include <QtWebKitWidgets/QWebPage>
-#include <QtWebKitWidgets/QWebFrame>
+#include <QtWebEngineWidgets/QWebEngineView>
+#include <QtWebEngineWidgets/QWebEnginePage>
+#include <QtWebEngineWidgets/QWebEngineProfile>
+#include <QtWebEngineWidgets/QWebEngineSettings>
+#include <QtWebEngineWidgets/QWebEngineHistory>
+#include <QtWebEngineWidgets/QWebEngineScript>
+#include <QtWebEngineWidgets/QWebEngineFullScreenRequest>
+#include <QtWebEngineWidgets/QWebEngineScriptCollection>
 
-class ZWebView;
+class ZWebEngineView;
 
 QApplication* application;
-QNetworkAccessManager* manager;
-QWebInspector* inspector;
 QFileSystemWatcher* watcher;
-QNetworkDiskCache* cache;
-
-QList<ZWebView*> webViews;
+QList<ZWebEngineView*> webEngineViews;
 QList<QString> requireList;
-QList<QString> scriptList;
+QList<QWebEngineScript> scriptList;
 QString configPath;
 QString scriptPath;
 QString downloadPath;
 QString cookiePath;
+QString cachePath;
 QString userAgent;
 QString homePage;
+QString cacheType;
+QStringList spellCheckLanguages;
 long embed;
-long maxHistory;
 bool cacheEnabled;
 bool saveCookies;
 bool allowPopups;
-
-class ZNetworkCookieJar : public QNetworkCookieJar {
-
-public :
-    ZNetworkCookieJar()
-    {
-        // Load session cookies
-        QDir cookieDir;
-        cookieDir.setPath(cookiePath);
-        QStringList fileList = cookieDir.entryList();
-        QByteArray cookiesData;
-        for(int i = 2; i < fileList.length(); i++)
-        {
-            QFile file(cookiePath + fileList[i]);
-            if(file.open(QIODevice::ReadOnly))
-            {
-                cookiesData.append(file.readAll() + '\n');
-                file.close();
-            } else
-            {
-                qDebug() << "Error loading cookie:" << cookiePath << fileList[i];
-            }
-        }
-
-        QList<QNetworkCookie> cookieList;
-        cookieList = QNetworkCookie::parseCookies(cookiesData);
-        if(cookieList.length() > 0) {
-            setAllCookies(cookieList);
-        }
-    }
-
-    bool setCookiesFromUrl(const QList<QNetworkCookie> &cookieList, const QUrl &url)
-    {
-        QNetworkCookieJar::setCookiesFromUrl(cookieList, url);
-        if(saveCookies)
-        {
-            for(int i = 0; i < cookieList.length(); i++)
-            {
-                if(!cookieList[i].isSessionCookie())
-                {
-                    QFile file(cookiePath + cookieList[i].name());
-                    if(file.open(QIODevice::WriteOnly))
-                    {
-                        QNetworkCookie cookie = cookieList[i];
-                        if(cookie.domain()[0] != '.')
-                        {
-                            cookie.setDomain('.' + cookie.domain());
-                        }
-                        QByteArray cookieData = cookie.toRawForm();
-                        file.write(cookieData.data(), cookieData.length());
-                        file.close();
-                        qDebug() << "Saved cookie: " << cookie.name();
-                    }
-                }
-            }
-        }
-    }
-};
-
-// Extend QWebPage to set user agent.
-class ZWebPage : public QWebPage {
-    QString userAgentForUrl(const QUrl &url ) const
-    {
-        return QString(userAgent);
-    }
-};
+bool spellCheck;
 
 // Extend QWebView to break fullscreen on Esc.
-class ZWebView : public QWebView {
+class ZWebEngineView : public QWebEngineView {
 
 public :
     Qt::WindowStates prevWindowState;
 
-    ZWebView(QString url, bool visible)
+    ZWebEngineView(QString url, bool visible)
     {
+        for(int i = 0; i < scriptList.length(); i++) {
+            page()->scripts().insert(scriptList[i]);
+        }
 
-        ZWebPage* webPage = new ZWebPage();
+        // Configure user agent
+        page()->profile()->setHttpUserAgent(userAgent);
 
-        webPage->setNetworkAccessManager(manager);
+        // Configure spellchecking
+        page()->profile()->setSpellCheckEnabled(spellCheck);
+        page()->profile()->setSpellCheckLanguages(spellCheckLanguages);
 
-        setPage(webPage);
-
-        history()->setMaximumItemCount(maxHistory);
-
-        // Evaluate script every time page is loaded.
-        QObject::connect(page()->mainFrame(), &QWebFrame::javaScriptWindowObjectCleared, [&]()
+        // Configure cache
+        page()->profile()->setCachePath(cachePath);
+        if(cacheType == "none")
         {
-            if(!cacheEnabled){
-                QWebSettings::clearMemoryCaches();
-            }
-
-            for(int i = 0; i < scriptList.size(); i++)
-            {
-                page()->mainFrame()->evaluateJavaScript(scriptList[i]);
-            }
-            qDebug() << "Scripts evaluated.";
-        });
-
-        // Bind inspector to key.
-        QShortcut *inspectorShortcut = new QShortcut(QKeySequence("F12"), this);
-        QObject::connect(inspectorShortcut, &QShortcut::activated, [&]()
+            page()->profile()->setHttpCacheType(QWebEngineProfile::NoCache);
+        } else if(cacheType == "disk")
         {
-            if(inspector == NULL)
-            {
-                QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
-                inspector = new QWebInspector();
-                inspector->setPage(page());
-                inspector->adjustSize();
-                inspector->setVisible(true);
-            } else
-            {
-                QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, false);
-                inspector->setVisible(false);
-                inspector->deleteLater();
-                inspector = NULL;
-            }
-        });
+            page()->profile()->setHttpCacheType(QWebEngineProfile::DiskHttpCache);
+        } else if(cacheType == "memory")
+        {
+            page()->profile()->setHttpCacheType(QWebEngineProfile::MemoryHttpCache);
+        }
+
+        // Configure cookies
+        page()->profile()->setPersistentStoragePath(cookiePath);
+        if(saveCookies)
+        {
+            page()->profile()->setPersistentCookiesPolicy(QWebEngineProfile::AllowPersistentCookies);
+        } else
+        {
+            page()->profile()->setPersistentCookiesPolicy(QWebEngineProfile::NoPersistentCookies);
+        }
 
         // Handle fullscreen request
-        QObject::connect(page(), &QWebPage::fullScreenRequested, [&](QWebFullScreenRequest request)
+        QObject::connect(page(), &QWebEnginePage::fullScreenRequested, [&](QWebEngineFullScreenRequest fullScreenRequest)
         {
             qDebug() << "Fullscreen request.";
-            request.accept();
-            if(request.toggleOn()){
+            fullScreenRequest.accept();
+            if(fullScreenRequest.toggleOn()){
                 prevWindowState = windowState();
                 showFullScreen();
             } else {
@@ -183,44 +103,40 @@ public :
         });
 
         // Handle feature request
-        QObject::connect(page(), &QWebPage::featurePermissionRequested, [&](QWebFrame* frame, QWebPage::Feature feature){
+        QObject::connect(page(), &QWebEnginePage::featurePermissionRequested, [&](const QUrl &securityOrigin, QWebEnginePage::Feature feature){
             qDebug() << "Accepted feature request.";
-            page()->setFeaturePermission(frame, feature, QWebPage::PermissionGrantedByUser);
+            page()->setFeaturePermission(securityOrigin, feature, QWebEnginePage::PermissionGrantedByUser);
         });
 
         // Handle download request
-        QObject::connect(page(), &QWebPage::downloadRequested, [&](QNetworkRequest request)
+        QObject::connect(page()->profile(), &QWebEngineProfile::downloadRequested, [&](QWebEngineDownloadItem* download)
         {
             qDebug() << "Download requested.";
-            QString fileName = QFileDialog::getSaveFileName(this, "Save File", downloadPath + request.url().fileName());
-
+            QString fileName = QFileDialog::getSaveFileName(this, "Save File", downloadPath + download->url().fileName());
             if(fileName != ""){
-                manager->get(request);
-                QObject::connect(manager, &QNetworkAccessManager::finished, [&,fileName](QNetworkReply* reply)
+                download->setPath(fileName);
+                download->accept();
+                QObject::connect(download, &QWebEngineDownloadItem::stateChanged, [&, fileName](QWebEngineDownloadItem::DownloadState state)
                 {
-                    QFile file(fileName);
-                    if(file.open(QIODevice::WriteOnly))
+                    if(state == QWebEngineDownloadItem::DownloadCompleted)
                     {
-                        QDataStream out(&file);
-                        out.writeRawData(reply->readAll(), reply->size());
-
                         qDebug() << "Download Complete: " << fileName;
-                        QMessageBox msgBox;
-                        msgBox.setText("Download Complete: " + fileName);
-                        msgBox.show();
+                        QMessageBox* msgBox = new QMessageBox();
+                        msgBox->setText("Download Complete: " + fileName);
+                        msgBox->show();
                     } else
                     {
                         qDebug() << "Download Failed: " << fileName;
-                        QMessageBox msgBox;
-                        msgBox.setText("Download Failed: " + fileName);
-                        msgBox.show();
+                        QMessageBox* msgBox = new QMessageBox();
+                        msgBox->setText("Download Failed: " + fileName);
+                        msgBox->show();
                     }
                 });
             }
         });
 
         // Handle close window request
-        QObject::connect(page(), &QWebPage::windowCloseRequested, [&](){
+        QObject::connect(page(), &QWebEnginePage::windowCloseRequested, [&](){
             close();
         });
 
@@ -228,13 +144,6 @@ public :
         {
             // Load specified page.
             load(QUrl(url));
-        } else
-        {
-            // Evaluate scripts
-            for(int i = 0; i < scriptList.size(); i++)
-            {
-                page()->mainFrame()->evaluateJavaScript(scriptList[i]);
-            }
         }
 
         // Display window
@@ -253,12 +162,8 @@ public :
             show();
         }
 
-        // Disable scrollbars
-        page()->mainFrame()->setScrollBarPolicy(Qt::Horizontal,Qt::ScrollBarAlwaysOff);
-        page()->mainFrame()->setScrollBarPolicy(Qt::Vertical,Qt::ScrollBarAlwaysOff);
-
         // Work around for resize bug.
-        if(webViews.length() == 0){
+        if(webEngineViews.length() == 0){
             QTimer::singleShot(1000, application, [this]()
             {
                 int oldWidth = width();
@@ -269,33 +174,24 @@ public :
         }
         setAttribute(Qt::WA_DeleteOnClose, true);
 
-        webViews.push_back(this);
-
+        webEngineViews.push_back(this);
     }
 
-    ZWebView() : ZWebView("", true) {}
+    ZWebEngineView() : ZWebEngineView("", true) {}
 
     void keyPressEvent(QKeyEvent* e)
     {
-        if(e->key() == Qt::Key_Escape && windowState() == Qt::WindowFullScreen){
-            QWebView::setWindowState(prevWindowState);
-            QWebView::page()->mainFrame()->evaluateJavaScript("document.webkitCancelFullScreen();");
-        } else
-        {
-            QWebView::keyPressEvent(e);
-        }
+        QWebEngineView::keyPressEvent(e);
     }
 
-    ZWebView* createWindow(QWebPage::WebWindowType type)
+    ZWebEngineView* createWindow(QWebEnginePage::WebWindowType type)
     {
         Q_UNUSED(type);
 
         if(allowPopups){
-            ZWebView* webView = new ZWebView();
-
-        qDebug() << "New window";
+            ZWebEngineView* webView = new ZWebEngineView();
+            qDebug() << "New window";
             return webView;
-
         }
         else
         {
@@ -305,7 +201,7 @@ public :
 
     void closeEvent(QCloseEvent *event){
         qDebug() << "Close window";
-        webViews.removeOne(this);
+        webEngineViews.removeOne(this);
         delete this;
     }
 
@@ -315,18 +211,29 @@ public :
 void loadScripts()
 {
     scriptList.clear();
+
     for(int i = 0; i < requireList.length(); i++)
     {
         QFile file(scriptPath + requireList[i]);
         if(file.open(QIODevice::ReadOnly))
         {
-            scriptList.push_back(file.readAll());
+
+            QWebEngineScript script;
+            script.setSourceCode(file.readAll());
+            script.setWorldId(QWebEngineScript::ApplicationWorld);
+            script.setInjectionPoint(QWebEngineScript::DocumentCreation);
+            scriptList.push_back(script);
             file.close();
             qDebug() << "Script loaded:" << scriptPath << requireList[i];
         } else
         {
             qDebug() << "Error loading script:" << scriptPath << requireList[i];
         }
+    }
+
+    for(int i = 0; i < webEngineViews.length(); i++){
+        webEngineViews[i]->page()->scripts().clear();
+        webEngineViews[i]->page()->scripts().insert(scriptList);
     }
 }
 
@@ -352,16 +259,13 @@ void liveReload()
                 watcher->addPath(scriptPath + requireList[i]);
             }
 
-            for (QWebView* webView : webViews)
+            for (QWebEngineView* webEngineView : webEngineViews)
             {
-                webView->reload();
+                webEngineView->reload();
             }
         });
     });
 }
-
-// Method to open a Window.
-
 
 // Load configuration settings.
 void loadConfig()
@@ -383,6 +287,10 @@ void loadConfig()
     QSettings settings(configPath, QSettings::IniFormat);
     qDebug() << "Config loaded:" << configPath;   
 
+    // Configure spell check
+    spellCheck = settings.value("spell_check").toBool();
+    spellCheckLanguages = settings.value("spell_check_languages").toString().split(",");
+
     // Set popup policy
     if(!settings.value("allow_popups").isNull())
     {
@@ -392,23 +300,12 @@ void loadConfig()
         allowPopups = false;
     }
 
-
-    // Set max history
-    if(!settings.value("max_history").isNull())
-    {
-        maxHistory = settings.value("max_history").toInt();
-    } else
-    {
-        maxHistory = 3;
-    }
-
     // Determine if cache is enabled
-    if(settings.value("cache_enabled").isNull()){
-        QWebSettings::globalSettings()->setObjectCacheCapacities(0,0,0);
-        QWebSettings::globalSettings()->setMaximumPagesInCache(0);
-        cacheEnabled = false;
+    if(settings.value("cache_type").isNull())
+    {
+        cacheType = settings.value("cache_type").toString();
     } else {
-        cacheEnabled = true;
+        cacheType = "memory";
     }
 
     // Set home page
@@ -426,10 +323,10 @@ void loadConfig()
     // Set cache path
     if(!settings.value("cache_path").isNull())
     {
-        QWebSettings::globalSettings()->setOfflineWebApplicationCachePath(settings.value("cache_path").toString());
+        cachePath = settings.value("cache_path").toString();
     } else
     {
-        QWebSettings::globalSettings()->setOfflineWebApplicationCachePath("/tmp/zsurf/cache/");
+        cachePath = "/tmp/zsurf/cache/";
     }
 
     // Set download path
@@ -449,10 +346,6 @@ void loadConfig()
     {
         cookiePath = "/tmp/zsurf/cookies/";
     }
-
-    // Create cookie jar and attach it to network manager.
-    ZNetworkCookieJar* cookies = new ZNetworkCookieJar();
-    manager->setCookieJar(cookies);
 
     // Determine if we save session cookies or not.
     saveCookies = settings.value("save_cookies").toBool();
@@ -500,38 +393,26 @@ void loadConfig()
     QNetworkProxy::setApplicationProxy(proxy);
 
     // Performance Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LinksIncludedInFocusChain, settings.value("links_included_in_focus_chain").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::SpatialNavigationEnabled, settings.value("spatial_navication").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::Accelerated2dCanvasEnabled, settings.value("accelerated_2d_canvas").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::AcceleratedCompositingEnabled, settings.value("accelerated_compositing").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, settings.value("dns_prefetch").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::LinksIncludedInFocusChain, settings.value("links_included_in_focus_chain").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::SpatialNavigationEnabled, settings.value("spatial_navication").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::Accelerated2dCanvasEnabled, settings.value("accelerated_2d_canvas").toBool());
 
     // Media Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::MediaEnabled, settings.value("media_enabled").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::MediaSourceEnabled,settings.value("media_source").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebGLEnabled,settings.value("webgl").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebAudioEnabled, settings.value("web_audio").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::FullScreenSupportEnabled,settings.value("full_screen_support").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::WebGLEnabled,settings.value("webgl").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::FullScreenSupportEnabled,settings.value("full_screen_support").toBool());
 
     // Privacy Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::OfflineStorageDatabaseEnabled,settings.value("offline_storage_database").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::OfflineWebApplicationCacheEnabled,settings.value("offline_web_application_cache").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalStorageDatabaseEnabled,settings.value("local_storage_database").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalStorageEnabled,settings.value("local_storage").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::PrivateBrowsingEnabled,settings.value("private_browsing").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::LocalStorageEnabled,settings.value("local_storage").toBool());
 
     // Security Settings
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::FrameFlatteningEnabled,settings.value("frame_flattening").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanCloseWindows,settings.value("javascript_can_close_windows").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanOpenWindows,settings.value("javascript_can_open_windows").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanAccessClipboard,settings.value("javascript_can_access_clipboard").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptEnabled,settings.value("javascript").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessFileUrls, settings.value("local_content_can_access_file_urls").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls,settings.value("local_content_can_access_remote_urls").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::PluginsEnabled,settings.value("plugins").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebSecurityEnabled,settings.value("web_security").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::XSSAuditingEnabled,settings.value("xss_auditing").toBool());
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::HyperlinkAuditingEnabled, settings.value("hyperlink_auditing").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::JavascriptCanOpenWindows,settings.value("javascript_can_open_windows").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::JavascriptCanAccessClipboard,settings.value("javascript_can_access_clipboard").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::JavascriptEnabled,settings.value("javascript").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::LocalContentCanAccessFileUrls, settings.value("local_content_can_access_file_urls").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::LocalContentCanAccessRemoteUrls,settings.value("local_content_can_access_remote_urls").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::PluginsEnabled,settings.value("plugins").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::XSSAuditingEnabled,settings.value("xss_auditing").toBool());
+    QWebEngineSettings::globalSettings()->setAttribute(QWebEngineSettings::HyperlinkAuditingEnabled, settings.value("hyperlink_auditing").toBool());
 }
 
 int main(int argc, char* argv[])
@@ -553,9 +434,6 @@ int main(int argc, char* argv[])
         }
     }
 
-    // Initialize network manger
-    manager = new QNetworkAccessManager();
-
     // Load config
     loadConfig();
 
@@ -566,7 +444,7 @@ int main(int argc, char* argv[])
     liveReload();
 
     // Open primary web view.
-    new ZWebView(homePage, true);
+    new ZWebEngineView(homePage, true);
 
     // Return exit status.
     return application->exec();
