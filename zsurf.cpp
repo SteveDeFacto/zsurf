@@ -222,6 +222,7 @@ void loadScripts()
             script.setSourceCode(file.readAll());
             script.setWorldId(QWebEngineScript::ApplicationWorld);
             script.setInjectionPoint(QWebEngineScript::DocumentCreation);
+            script.setRunsOnSubFrames(true);
             scriptList.push_back(script);
             file.close();
             qDebug() << "Script loaded:" << scriptPath << requireList[i];
