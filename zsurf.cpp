@@ -202,7 +202,6 @@ public :
     void closeEvent(QCloseEvent *event){
         qDebug() << "Close window";
         webEngineViews.removeOne(this);
-        delete this;
     }
 
 };
