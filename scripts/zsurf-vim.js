@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
 
 	// Unfocus active textbox
 	unfocus();
+
 });
 
 
@@ -52,7 +53,6 @@ document.addEventListener('webkitfullscreenchange', function(e){
 });
 
 document.addEventListener('keydown', initKeyBind, true, true);
-
 
 // Intercept all calls to addEventListener or removeEventListener.
 oldAddEventListener = HTMLElement.prototype.addEventListener;
@@ -552,7 +552,6 @@ function findText(word, node){
 	}
 }
 
-
 function unhighlight(){
 	for (var i = 0; i < highlights.length; i++){
 		var the_text_node = highlights[i].firstChild;
@@ -753,10 +752,12 @@ function inputText(command){
 
 function unfocus(){
 	removeHints()
-	if(document.activeElement != null){
-		var panel = document.querySelector("#zsurf-panel");
+	var panel = document.querySelector("#zsurf-panel");
+	if(panel){
 		panel.hide();
-		setTimeout(function(){
+	}
+	if(document.activeElement != null && document.activeElement != document.body){
+			setTimeout(function(){
 			document.activeElement.blur();
 		}, 1);
 	}
@@ -850,7 +851,15 @@ function initKeyBind(e){
 			addKeyBind( 'Up', function(){prevCommand();}, e );
 			addKeyBind( 'Down', function(){nextCommand();}, e );
 		}
-		addKeyBind( 'Escape', function(){unfocus(); unhighlight(); document.webkitCancelFullScreen(); window.top.focus();}, e );
+		addKeyBind( 'Escape', function(){
+
+			unfocus();	
+			unhighlight();
+			window.top.focus();
+			if(document.webkitIsFullScreen)	{
+				document.webkitCancelFullScreen();
+			}
+		}, e );
 	}
 	addKeyBind( 'Insert', function(){togglePassthrough();}, e );
 }
