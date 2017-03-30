@@ -40,10 +40,19 @@ document.addEventListener('DOMContentLoaded', function(event) {
 
 	// Unfocus active textbox
 	unfocus();
+});
 
+
+document.addEventListener('webkitfullscreenchange', function(e){
+	if(document.webkitIsFullScreen)	{
+		document.body.style.zoom = 1;
+	} else {
+		document.body.style.zoom = zoomLevel;
+	}
 });
 
 document.addEventListener('keydown', initKeyBind, true, true);
+
 
 // Intercept all calls to addEventListener or removeEventListener.
 oldAddEventListener = HTMLElement.prototype.addEventListener;
@@ -331,20 +340,18 @@ function judgeHintNum(hintNum) {
 function execSelect(elem) {
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
-	bypassBlocker = true;
-    if (tagName == 'a' && elem.href != '') {
+
+	if (tagName == 'a' && elem.getAttribute('href').length > 0) {
         setHighlight(elem, true);
+
         if (hintOpenInNewTab) {
             window.open(elem.href);
-		} else if(elem.href.indexOf('javascript:') == -1 &&
-				elem.href.indexOf('#') == -1 &&
-				elem.href.length != 0){
+		} else if(elem.href.indexOf('javascript:') == -1 && elem.getAttribute('href') != '#' ){
 			location.href = elem.href;
 		} else {
-			console.log('click element');
 			elem.click();
 		}
-    } else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset")) {
+	} else if (tagName == 'input' && (type == "submit" || type == "button" || type == "reset")) {
 		elem.click();
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
         elem.checked = !elem.checked;
@@ -372,15 +379,15 @@ function setHints() {
 	var offset = 0;
 
 	// Query elements which can be clicked
-    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], [role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], [role=button], iframe, area, textarea, select, button, [onclick], [onfocus], [data-ui-tracking-context]');
+    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], [role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], [role=button], iframe, area, textarea, select, button, [onclick], [onfocus], [data-ui-tracking-context], [ng-click]');
 
 	// Add list of click elements we collected from event listeners
 	elems = clickableElems.concat(Array.from(elems));
 
 	// Remove duplicates
-	elems = elems.filter(function(item, pos, self) {
-    	return self.indexOf(item) == pos;
-	})
+	//elems = elems.filter(function(item, pos, self) {
+   // 	return self.indexOf(item) == pos;
+	//})
 
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
@@ -761,10 +768,10 @@ function setClipboard(text){
 	input.style.top = 0;
 	input.type = "text";
     document.body.appendChild(input);
-	input.value = window.location;
+	input.value = text;
 	input.focus();
 	input.select();
-	document.execCommand('copy', false, text);
+	document.execCommand('copy');
 	input.remove();
 }
 

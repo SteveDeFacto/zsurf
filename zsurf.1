@@ -1,23 +1,62 @@
 .TH zsurf 1 "2017-3-1" "zero surf" "User Commands"
 .\" --------------------------------------------------------------------
 .SH NAME
-zsurf \- basic webkit2gtk browser
+zsurf \-  browser
 .\" --------------------------------------------------------------------
 .SH DESCRIPTION
-\fBzsurf\fP is a simple web browser, using GTK+ 3 and WebKit2GTK+.
+\fBzsurf\fP is a simple web browser, using GTK+ 3 and QtWebEngine.
 .\" --------------------------------------------------------------------
 
 .SH SHORTCUTS
 
-For actual list of shortcuts/keys refer to page of project http://github.com/SteveDeFacto/zsurf
+\fBEscape\fP Break fullscreen, unfocus iframe, hide hints, and hide search highlights.
+
+\fBShift-h\fP Walks back the history.
+
+\fBShift-l\fP Walks forward the history.
+
+\fBk\fP Scrolls page upwards.
+
+\fBj\fP Scrolls page downwards.
+
+\fBShift-U\fP Scroll up one whole page view.
+
+\fBShift-D\fP Scroll down one  whole page view.
+
+\fBl\fP Scroll horizontally to the right.
+
+\fBh\fP Scroll horizontally to the left.
+
+\fBShift-ih\fP Zooms page in.
+
+\fBShift-oh\fP Zooms page out.
+
+\fB/\fP Opens the search-bar.
+
+\fBn\fP Go to next search result.
+
+\fBp\fP Go to previous search result.
+
+\fBo\fP Opens the URL-bar.
+
+\fBr\fP Reloads the page.
+
+\fBShift-r\fP Reloads the website without using the cache.
+
+\fBy\fP Copies current URI to primary selection.
+
 .\" --------------------------------------------------------------------
 
 .SH FILES
 Files created in your home dir:
 .TP
- .zsurf - directory for cookies, cached content, and bookmarks.
+ .zsurf - local folder for zsurf which generally will contain a config.ini.
 .TP
- .local/share/webkitgtk/* - directories for local storage and databases.
+ .zsurf/scripts - folder with custom scripts.
+.TP
+ .local/share/zsurf/QtWebEngine/Default/* - default directories for local storage and databases.
+.TP
+ /usr/share/zsurf - contains default config and default scripts.
 .\" --------------------------------------------------------------------
 .SH LICENSE
 \fBzsurf\fP is on GPL license.
