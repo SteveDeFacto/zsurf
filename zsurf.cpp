@@ -16,14 +16,15 @@
 #include <QFileInfo>
 #include <QFile>
 #include <QDir>
-#include <QtWebEngineWidgets/QWebEngineView>
-#include <QtWebEngineWidgets/QWebEnginePage>
-#include <QtWebEngineWidgets/QWebEngineProfile>
-#include <QtWebEngineWidgets/QWebEngineSettings>
-#include <QtWebEngineWidgets/QWebEngineHistory>
-#include <QtWebEngineWidgets/QWebEngineScript>
-#include <QtWebEngineWidgets/QWebEngineFullScreenRequest>
-#include <QtWebEngineWidgets/QWebEngineScriptCollection>
+#include <QWebEngineView>
+#include <QWebEnginePage>
+#include <QWebEngineProfile>
+#include <QWebEngineSettings>
+#include <QWebEngineHistory>
+#include <QWebEngineScript>
+#include <QWebEngineFullScreenRequest>
+#include <QWebEngineScriptCollection>
+#include <QAction>
 
 class ZWebEngineView;
 
@@ -90,6 +91,13 @@ public :
         }
 
         // Handle fullscreen request
+        QObject::connect(page(), &QWebEnginePage::windowCloseRequested, [&]()
+        {
+
+        });
+
+
+        // Handle fullscreen request
         QObject::connect(page(), &QWebEnginePage::fullScreenRequested, [&](QWebEngineFullScreenRequest fullScreenRequest)
         {
             qDebug() << "Fullscreen request.";
@@ -106,6 +114,7 @@ public :
         QObject::connect(page(), &QWebEnginePage::featurePermissionRequested, [&](const QUrl &securityOrigin, QWebEnginePage::Feature feature){
             qDebug() << "Accepted feature request.";
             page()->setFeaturePermission(securityOrigin, feature, QWebEnginePage::PermissionGrantedByUser);
+
         });
 
         // Handle download request
@@ -137,6 +146,7 @@ public :
 
         // Handle close window request
         QObject::connect(page(), &QWebEnginePage::windowCloseRequested, [&](){
+            qDebug()<<"allow close";
             close();
         });
 
@@ -203,7 +213,6 @@ public :
         qDebug() << "Close window";
         webEngineViews.removeOne(this);
     }
-
 };
 
 // Function to load javascripts.
