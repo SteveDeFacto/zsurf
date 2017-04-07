@@ -405,8 +405,7 @@ function execSelect(elem) {
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
 	if (tagName == 'a' && elem.getAttribute('href').length > 0) {
-        setHighlight(elem, true);
-
+//        setHighlight(elem, true);
         if (hintOpenInNewTab) {
             window.open(elem.href);
 		} else if(elem.href.indexOf('javascript:') == -1 && elem.getAttribute('href') != '#' ){
@@ -456,7 +455,7 @@ function setHints() {
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
     document.body.appendChild(div);
-    for (var i = 0; i < elems.length; i++) {
+    for (var i = elems.length-1; i >= 0 ; i--) {
         var elem = elems[i];
         if (!isHintDisplay(elem))
             continue;
@@ -508,7 +507,7 @@ function setHints() {
                 'font-weight: bold !important;',
                 'padding: 0px 1px !important;',
 				'margin: 0px !important;',
-                'z-index: 2147483647 !important;',
+                'z-index: 2147183647 !important;',
 				'text-transform: uppercase !important;',
             ].join('');
             hint.innerHTML = num2Str(hintElems.length);
