@@ -52,7 +52,6 @@ function addEventListenerExt(type, callback, capture, old) {
 	} else {
 		eventListeners[this].push(type);
 	}
-	
 	if( (type != 'keydown' &&
 		type != 'keyup' &&
 		type != 'keypress') ||
@@ -74,10 +73,8 @@ function addEventListenerExt(type, callback, capture, old) {
 			type == 'focus'){
 			focusableElems.push(this);
 		}
-
 		return old.call(this, type, callback, capture);
 	} else if(!allowPassthrough){
-		
 		passthroughEvents.push({
 			"element" : this,
 			"type" : type,
@@ -122,9 +119,6 @@ document.addEventListener('DOMContentLoaded', function(event) {
 	sheet.innerHTML = 'body {overflow: hidden;} ::-webkit-scrollbar{display:none;}';
 	document.body.appendChild(sheet);
 
-	// Create GUI
-	createGui();
-
 	// Unfocus active textbox
 	unfocus();
 
@@ -152,6 +146,7 @@ function createGui(){
 		var info = document.createElement('textarea');
 			info.id = "zsurf-info";
 			info.style.cssText = [
+				'display: none;',
 				'width: 100% !important;',
 				'left: 0px !important;',
 				'bottom: 26px !important;',
@@ -271,10 +266,7 @@ function createGui(){
 
 // Toggle passthrough mode
 function togglePassthrough(){
-	console.log("try to toggle passthrough");
 	if(allowPassthrough){
-		console.log("togglePassthrough Off");
-
 		allowPassthrough = false;
 		for(var i = 0; i < passthroughEvents.length; i++){
 			passthroughEvents[i]['element'].removeEventListener(
@@ -288,8 +280,6 @@ function togglePassthrough(){
 			document.addEventListener('keydown', initKeyBind, true);
 		}, 1000);
 	} else {
-		console.log("togglePassthrough On");
-
 		allowPassthrough = true;
 		for(var i = 0; i < passthroughEvents.length; i++){
 			passthroughEvents[i]['element'].addEventListener(
@@ -300,7 +290,7 @@ function togglePassthrough(){
 		document.removeEventListener('keydown', initKeyBind, true);
 
 		setTimeout(function(){
-		document.addEventListener('keydown', initKeyBind, false);
+			document.addEventListener('keydown', initKeyBind, false);
 		}, 1000);
 	}
 }
@@ -404,8 +394,7 @@ function judgeHintNum(hintNum) {
 function execSelect(elem) {
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
-	if (tagName == 'a' && elem.getAttribute('href').length > 0) {
-//        setHighlight(elem, true);
+	if (tagName == 'a' && elem.hasAttribute('href') && elem.getAttribute('href').length > 0) {
         if (hintOpenInNewTab) {
             window.open(elem.href);
 		} else if(elem.href.indexOf('javascript:') == -1 && elem.getAttribute('href') != '#' ){
