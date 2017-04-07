@@ -56,6 +56,7 @@ public :
 
     ZWebEngineView(QString url, bool visible)
     {
+        // Add scripts to page
         for(int i = 0; i < scriptList.length(); i++) {
             page()->scripts().insert(scriptList[i]);
         }
@@ -91,13 +92,6 @@ public :
         }
 
         // Handle fullscreen request
-        QObject::connect(page(), &QWebEnginePage::windowCloseRequested, [&]()
-        {
-
-        });
-
-
-        // Handle fullscreen request
         QObject::connect(page(), &QWebEnginePage::fullScreenRequested, [&](QWebEngineFullScreenRequest fullScreenRequest)
         {
             qDebug() << "Fullscreen request.";
@@ -114,7 +108,6 @@ public :
         QObject::connect(page(), &QWebEnginePage::featurePermissionRequested, [&](const QUrl &securityOrigin, QWebEnginePage::Feature feature){
             qDebug() << "Accepted feature request.";
             page()->setFeaturePermission(securityOrigin, feature, QWebEnginePage::PermissionGrantedByUser);
-
         });
 
         // Handle download request
@@ -146,13 +139,14 @@ public :
 
         // Handle close window request
         QObject::connect(page(), &QWebEnginePage::windowCloseRequested, [&](){
-            qDebug()<<"allow close";
+            qDebug()<<"Close window.";
             close();
         });
 
+
+        // Load specified page.
         if(!url.isEmpty())
         {
-            // Load specified page.
             load(QUrl(url));
         }
 
@@ -189,11 +183,6 @@ public :
 
     ZWebEngineView() : ZWebEngineView("", true) {}
 
-    void keyPressEvent(QKeyEvent* e)
-    {
-        QWebEngineView::keyPressEvent(e);
-    }
-
     ZWebEngineView* createWindow(QWebEnginePage::WebWindowType type)
     {
         Q_UNUSED(type);
@@ -208,14 +197,9 @@ public :
             return NULL;
         }
     }
-
-    void closeEvent(QCloseEvent *event){
-        qDebug() << "Close window";
-        webEngineViews.removeOne(this);
-    }
 };
 
-// Function to load javascripts.
+// Load javascripts.
 void loadScripts()
 {
     scriptList.clear();
@@ -249,8 +233,7 @@ void loadScripts()
 // Allow live reload of javascripts.
 void liveReload()
 {
-    watcher = new QFileSystemWatcher();
-
+    watcher = new QFileSystemWatcher();	
     for(int i = 0; i < requireList.length(); i++)
     {
         watcher->addPath(scriptPath + requireList[i]);
@@ -457,5 +440,4 @@ int main(int argc, char* argv[])
 
     // Return exit status.
     return application->exec();
-
 }
