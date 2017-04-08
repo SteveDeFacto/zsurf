@@ -58,7 +58,6 @@ function addEventListenerExt(type, callback, capture, old) {
 		callback == parseCommand ||
 		callback == initKeyBind ||
 		callback == hintHandler){
-
 		if( type == 'click' ||
 			type == 'dblclick' ||
 			type == 'pointerdown' ||
@@ -107,19 +106,22 @@ window.addEventListener('error', function(event) {
 });
 
 document.addEventListener('DOMContentLoaded', function(event) {
-	var storedZoomLevel = localStorage.getItem('zoomLevel');
 
+	// Set zoom level for page
+	var storedZoomLevel = localStorage.getItem('zoomLevel');
 	if(!isNaN(storedZoomLevel) && storedZoomLevel != null){
 		zoomLevel = Number(storedZoomLevel);
 		document.body.style.zoom = zoomLevel;
 	}
+
+	// Remove scrollbars from the page
 	var sheet = document.createElement('style');
 	sheet.id = 'zsurf-style';
 	sheet.type = 'text/css'
 	sheet.innerHTML = 'body {overflow: hidden;} ::-webkit-scrollbar{display:none;}';
 	document.body.appendChild(sheet);
 
-	// Unfocus active textbox
+	// Try to unfocus active textbox(This doesn't always work)
 	unfocus();
 
 });
@@ -143,9 +145,9 @@ function createGui(){
 
 	if(panel == null){
 		
-		var info = document.createElement('textarea');
-			info.id = "zsurf-info";
-			info.style.cssText = [
+		var zsurfInfo = document.createElement('textarea');
+			zsurfInfo.id = "zsurf-info";
+			zsurfInfo.style.cssText = [
 				'display: none;',
 				'width: 100% !important;',
 				'left: 0px !important;',
@@ -153,7 +155,7 @@ function createGui(){
 				'height: 100px !important;',
 				'position: fixed !important;',
 				'color: white !important;',
-				'background-color: midnightblue !important;',
+				'background-color: rgba(0,0,64,0.8) !important;',
 				'font-family: Arial, Helvetica, sans-serif !important;',
 				'font-style: normal !important;',
 				'font-size: 13px !important;',
@@ -163,29 +165,29 @@ function createGui(){
 				'margin: 0 !important;',
 				'padding: 0 !important;',
 			].join('');
-		info.show = function() {	
+		zsurfInfo.show = function() {	
 			this.value = zsurfLog;
 			this.style.display = 'block';
 		}
-		info.hide = function() {
+		zsurfInfo.hide = function() {
 			this.style.display = 'none';
-			var console = document.getElementById('zsurf-console');
-			if(console.value.split(' ').length > 1){
-				commandHistory.push(console.value);
+			var zsurfConsole = document.getElementById('zsurf-console');
+			if(zsurfConsole.value.split(' ').length > 1){
+				commandHistory.push(zsurfConsole.value);
 				commandPointer = commandHistory.length -1;
 			}
 		}
 
-		var div = document.createElement('div');
-			div.id = "zsurf-panel";
-			div.style.cssText = [
+		var zsurfPanel = document.createElement('div');
+			zsurfPanel.id = "zsurf-panel";
+			zsurfPanel.style.cssText = [
 				'right: 0px !important;',
 				'left: 0px !important;',
 				'bottom: 0px !important;',
 				'height: 26px !important;',
 				'position: fixed !important;',
 				'color: white !important;',
-				'background-color: #000000 !important;',
+				'background-color: rgba(0,0,0,0.8) !important;',
 				'font-family: Arial, Helvetica, sans-serif !important;',
 				'font-style: normal !important;',
 				'font-size: 13px !important;',
@@ -195,20 +197,20 @@ function createGui(){
 				'margin: 0 !important;',
 				'padding: 0 !important;',
 			].join('');
-		div.show = function(){	
+		zsurfPanel.show = function(){	
 			this.style.display = 'block';
 		}
-		div.hide = function(){
+		zsurfPanel.hide = function(){
 			this.style.display = 'none';
-			info.hide();
+			zsurfInfo.hide();
 		}
 
-		var input = document.createElement('input');
-		input.id = "zsurf-console";
-		input.type = "text";
-		input.addEventListener('keydown', parseCommand, true);
+		var zsurfConsole = document.createElement('input');
+		zsurfConsole.id = "zsurf-console";
+		zsurfConsole.type = "text";
+		zsurfConsole.addEventListener('keydown', parseCommand, true);
 
-		input.style.cssText = [ 
+		zsurfConsole.style.cssText = [ 
 			'left: 0px !important;',
 			'bottom: 0px !important;',
 			'width: 100% !important;',
@@ -226,16 +228,17 @@ function createGui(){
 			'margin: 0 !important;',
 			'padding: 0 !important;',
 		].join('');
-		var span = document.createElement('span');
-		span.id = "zsurf-location";
+
+		var zsurfLocation = document.createElement('span');
+		zsurfLocation.id = "zsurf-location";
 
 		var splitUrl = window.location.href.split('/').filter(Boolean);
 		var shortUrl = window.location.href;
 		if(splitUrl.length > 3){
 			shortUrl = splitUrl[0] +'//'+ splitUrl[1] + '/../' + splitUrl[splitUrl.length - 1];
 		}
-		span.innerHTML = shortUrl;
-		span.style.cssText = [
+		zsurfLocation.innerHTML = shortUrl;
+		zsurfLocation.style.cssText = [
 			'right: 0px !important;',
 			'bottom: 0px !important;',
 			'height: 22px !important;',
@@ -253,12 +256,12 @@ function createGui(){
 			'line-height: 18px !important;',
 		].join('');
 
-		div.appendChild(span);
-		div.appendChild(input);
-		div.appendChild(info);
+		zsurfPanel.appendChild(zsurfLocation);
+		zsurfPanel.appendChild(zsurfConsole);
+		zsurfPanel.appendChild(zsurfInfo);
 
-		document.body.appendChild(div);
-		return div;
+		document.body.appendChild(zsurfPanel);
+		return zsurfPanel;
 	} else {
 		return panel;
 	}
@@ -426,12 +429,16 @@ function setHints() {
     var winBottom = winTop + (window.innerHeight/zoomLevel);
     var winLeft = window.scrollX/zoomLevel;
     var winRight = winLeft + (window.innerWidth/zoomLevel);
-	var lastElemLeft = 0;
-	var lastElemTop = 0;
+	var elemLeftList = [];
+	var elemTopList = [];
 	var offset = 0;
 
 	// Query elements which can be clicked
-    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], [role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], [role=button], iframe, area, textarea, select, button,[onpointerdown], [ondblclick], [onclick], [onfocus], [data-ui-tracking-context], [data-link], [ng-click]');
+    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], ' +
+			'[role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], ' + 
+			'[role=button], iframe, area, textarea, select, button,[onpointerdown], ' +
+			'[ondblclick], [onclick], [onfocus], [data-ui-tracking-context], ' +
+			'[data-link], [ng-click]');
 
 	// Add list of click elements we collected from event listeners
 	elems = clickableElems.concat(Array.from(elems));
@@ -444,15 +451,17 @@ function setHints() {
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
     document.body.appendChild(div);
-    for (var i = elems.length-1; i >= 0 ; i--) {
+    for (var i = 0; i < elems.length; i++) {
         var elem = elems[i];
         if (!isHintDisplay(elem))
             continue;
 	    var elemTop = winTop;
         var elemBottom = winTop;
         var elemLeft = winLeft;
-        var elemRight = winLeft;	
+        var elemRight = winLeft;
 		if(elem.tagName == 'AREA'){
+
+			// Get the position of the area tag from a combination of parent img and coords attribute. 
 			var posArray = elem.coords.split(',');
 			if(posArray.length == 4){
 				var imgElem = document.body.querySelector('[usemap="#'+elem.parentNode.name+'"]');
@@ -468,16 +477,21 @@ function setHints() {
 			elemLeft += pos.left;
 			elemRight += pos.left;
 		}
-		
-		if(elemLeft == lastElemLeft && elemTop ==lastElemTop){
-			offset += 20;
+
+		// Give hint an offset if another hint is already at this position
+		var indexLeft = elemLeftList.indexOf(elemLeft);
+		var indexRight = elemTopList.indexOf(elemTop);
+		if( indexLeft != -1 && indexRight != -1 && indexLeft == indexRight ) {
+			offset += 9;
 			elemLeft += offset;
 			elemTop += offset;
 		} else {
-			lastElemLeft = elemLeft;
-			lastElemTop = elemTop;
+			elemLeftList.push(elemLeft);
+			elemTopList.push(elemTop);
 			offset = 0;
 		}
+
+		// Add hint to page
         if ( elemBottom >= winTop && elemTop <= winBottom) {
             hintElems.push(elem);
             setHighlight(elem, false);
@@ -486,17 +500,17 @@ function setHints() {
                 'left: ', elemLeft, 'px !important;',
                 'top: ', elemTop, 'px !important;',
                 'position: absolute !important;',
-                'background-color: ' + (hintOpenInNewTab ? '#ff6600' : '#ff0000') + ' !important;',
+                'background-color: ' + (hintOpenInNewTab ? 'rgba(255, 128, 0, 0.65)' : 'rgba(255, 0, 0, 0.65)' ) + ' !important;',
 				'border: 1px solid white !important;',
 				'text-shadow: 1px 1px #000000 !important;',
                 'color: white !important;',
 				'font-family: Arial, Helvetica, sans-serif !important;',
 				'font-style: normal !important;',
-                'font-size: 16px !important;',
+                'font-size: ' + (16 / (1 + (offset/15))).toString() +'px !important;',
                 'font-weight: bold !important;',
                 'padding: 0px 1px !important;',
 				'margin: 0px !important;',
-                'z-index: 2147183647 !important;',
+                'z-index: 214718364' + (offset/9).toString() +' !important;',
 				'text-transform: uppercase !important;',
             ].join('');
             hint.innerHTML = num2Str(hintElems.length);
