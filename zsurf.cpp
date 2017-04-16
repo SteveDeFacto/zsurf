@@ -24,12 +24,15 @@
 #include <QWebEngineScript>
 #include <QWebEngineFullScreenRequest>
 #include <QWebEngineScriptCollection>
-#include <QAction>
+#include <QWebEngineUrlRequestInterceptor>
+#include <QWebEngineUrlRequestInfo>
 
 class ZWebEngineView;
+class ZWebEngineUrlRequestInterceptor;
 
 QApplication* application;
 QFileSystemWatcher* watcher;
+ZWebEngineUrlRequestInterceptor* requestInterceptor;
 QList<ZWebEngineView*> webEngineViews;
 QList<QString> requireList;
 QList<QWebEngineScript> scriptList;
@@ -47,6 +50,21 @@ bool cacheEnabled;
 bool saveCookies;
 bool allowPopups;
 bool spellCheck;
+/*
+// Content filtering
+class ZWebEngineUrlRequestInterceptor : public QWebEngineUrlRequestInterceptor {
+
+public:
+    ZWebEngineUrlRequestInterceptor(QObject* parent = Q_NULLPTR)
+      :QWebEngineUrlRequestInterceptor(parent) {
+
+    }
+
+    void interceptRequest(QWebEngineUrlRequestInfo &info){
+        info.block(true);
+    }
+};
+*/
 
 // Extend QWebView to break fullscreen on Esc.
 class ZWebEngineView : public QWebEngineView {
@@ -60,6 +78,10 @@ public :
         for(int i = 0; i < scriptList.length(); i++) {
             page()->scripts().insert(scriptList[i]);
         }
+
+        // Add url request interceptor to page profile
+        //requestInterceptor = new ZWebEngineUrlRequestInterceptor();
+        //page()->profile()->setRequestInterceptor(requestInterceptor);
 
         // Configure user agent
         page()->profile()->setHttpUserAgent(userAgent);

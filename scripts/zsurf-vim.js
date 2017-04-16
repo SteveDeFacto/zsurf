@@ -17,8 +17,6 @@ var allowPassthrough = false;
 var passthroughEvents = [];
 var clickableElems = [];
 var focusableElems = [];
-var addEventListenerHTMLElement = null;
-var removeEventListenerHTMLElement = null;
 var jsLogger = null;
 var zsurfLog = '';
 
@@ -29,75 +27,90 @@ console.log = function(message) {
 	jsLogger.apply(console, arguments);
 }
 
-// Intercept all calls to addEventListener or removeEventListener.
-addEventListenerHTMLElement = HTMLElement.prototype.addEventListener;
-removeEventListenerHTMLElement = HTMLElement.prototype.removeEventListener;
-HTMLElement.prototype.addEventListener = addEventListenerHTMLElementExt;
-HTMLElement.prototype.removeEventListener = removeEventListenerHTMLElementExt;
-
-// Wrapper for extended addEventListener
-function addEventListenerHTMLElementExt(type, callback, capture) {
-	addEventListenerExt.call(this, type, callback, capture, addEventListenerHTMLElement);
-} 
-
-// Wrapper for extended removeEventListener
-function removeEventListenerHTMLElementExt(type, callback, capture) {
-	removeEventListenerExt.call(this, type, callback, capture, removeEventListenerHTMLElement);
+// Check if a function is native or not.
+function isNative(func) {
+  return !('prototype' in func);
 }
 
+// Intercept all calls to addEventListener or removeEventListener.
+if(isNative(Node.prototype.addEventListener)){
+	addEventListenerNode = Node.prototype.addEventListener;
+}
+
+if(isNative(Node.prototype.removeEventListener)){
+	removeEventListenerNode = Node.prototype.removeEventListener;
+}
+Node.prototype.addEventListener = addEventListenerExt;
+Node.prototype.removeEventListener = removeEventListenerExt;
+
 // Extended addEventListener
-function addEventListenerExt(type, callback, capture, old) {
-	if(eventListeners[this] == undefined) {
-		eventListeners[this] = [type];	
-	} else {
-		eventListeners[this].push(type);
-	}
-	if( (type != 'keydown' &&
-		type != 'keyup' &&
-		type != 'keypress') ||
-		callback == parseCommand ||
-		callback == initKeyBind ||
-		callback == hintHandler){
-		if( type == 'click' ||
-			type == 'dblclick' ||
-			type == 'pointerdown' ||
-			type == 'touchstart' ||
-			type == 'mousedown'){
-			clickableElems.push(this);
-		} else if( type == 'click' ||
-			type == 'touchmove' ||
-			type == 'mouseenter' ||
-			type == 'mouseover' ||
-			type == 'mousemove' ||
-			type == 'focus'){
-			focusableElems.push(this);
-		}
-		return old.call(this, type, callback, capture);
-	} else if(!allowPassthrough){
-		passthroughEvents.push({
-			"element" : this,
+function addEventListenerExt(type, callback, capture) {
+	if(!isNative(callback)){
+
+		var eventArguments = {
 			"type" : type,
 			"callback" : callback,
 			"capture" : capture
-		});
+		};	
+		
+		if(eventListeners[this] == undefined) {
+			eventListeners[this] = [eventArguments];	
+		} else {
+			eventListeners[this].push(eventArguments);
+		}
+
+		if( (type != 'keydown' &&
+			type != 'keyup' &&
+			type != 'keypress') ||
+			callback == parseCommand ||
+			callback == initKeyBind ||
+			callback == hintHandler ) {
+			if( type == 'click' ||
+				type == 'dblclick' ||
+				type == 'pointerdown' ||
+				type == 'touchstart' ||
+				type == 'mousedown'){
+				clickableElems.push(this);
+			} else if( type == 'click' ||
+				type == 'touchmove' ||
+				type == 'mouseenter' ||
+				type == 'mouseover' ||
+				type == 'mousemove' ||
+				type == 'focus'){
+				focusableElems.push(this);
+			}
+
+			return addEventListenerNode.apply(this, arguments);
+		} else if(!allowPassthrough){
+
+			passthroughEvents.push({
+				"element" : this,
+				"type" : type,
+				"callback" : callback,
+				"capture" : capture
+			});
+		}
+		
+	} else {
+		return addEventListenerNode.apply(this, arguments);
 	}
 }
 
 // Extended removeEventListener
-function removeEventListenerExt(type, callback, capture, old) {
-	if(eventListeners[this] == undefined) {
-		eventListeners[this] = [];	
-	} else {
-		var i = eventListeners[this].indexOf(type);
-		if(i != -1) {
-			eventListeners[this].splice(type, i);
+function removeEventListenerExt(type, callback, capture) {
+
+	if(!isNative(callback)){
+		if(eventListeners[this] == undefined) {
+			eventListeners[this] = [];	
+		} else {
+			var i = eventListeners[this].indexOf(type);
+			if(i != -1) {
+				eventListeners[this].splice(type, i);
+			}
 		}
 	}
-	return old.call(this, type, callback, capture);
+	return removeEventListenerNode.apply(this, arguments);
 }
-
-// Handle onwheel event
-window.onwheel = function(e){removeHints(); window.scrollBy(0, -e.wheelDelta); return false; }
 
 // Log errors
 window.addEventListener('error', function(event) {
@@ -105,20 +118,73 @@ window.addEventListener('error', function(event) {
 	return false;
 });
 
+// Listen for messages from primary window
+window.addEventListener("message", function(e){	
+	if(window !== window.top){
+		var messageData = e.data.split(':');
+		if(messageData[0] == 'zoomLevel'){
+			zoomLevel = Number(messageData[1]);
+			document.body.style.zoom = zoomLevel;
+			var iframes = document.getElementsByTagName("iframe");
+			for(var i = 0; i < iframes.length; i++){
+				iframes[i].contentWindow.postMessage('zoomLevel:' + zoomLevel.toString(), '*');
+			}
+		}
+	}
+}, false);
+
+// Handle onwheel event
+window.onwheel = function(e){
+	removeHints();
+	if(e.ctrlKey){
+		zoom(e.wheelDelta/1000);
+	} else if(e.altKey){
+		window.scrollBy(-e.wheelDelta, 0);
+	} else {
+		window.scrollBy(0, -e.wheelDelta);
+	}
+	return true;
+}
+
 document.addEventListener('DOMContentLoaded', function(event) {
 
-	// Set zoom level for page
-	var storedZoomLevel = localStorage.getItem('zoomLevel');
-	if(!isNaN(storedZoomLevel) && storedZoomLevel != null){
-		zoomLevel = Number(storedZoomLevel);
-		document.body.style.zoom = zoomLevel;
+	if(window === window.top){
+
+		// Set zoom level for page
+		var storedZoomLevel = localStorage.getItem('zoomLevel');
+
+		if(!isNaN(storedZoomLevel) && storedZoomLevel != null){
+			zoomLevel = Number(storedZoomLevel);
+			document.body.style.zoom = zoomLevel;
+		}
+
+		var iframes = document.getElementsByTagName("iframe");
+		for(var i = 0; i < iframes.length; i++){
+			iframes[i].addEventListener('load', function(event) {
+				this.contentWindow.postMessage('zoomLevel:' + zoomLevel.toString(), '*');
+			});
+		}
 	}
 
 	// Remove scrollbars from the page
 	var sheet = document.createElement('style');
 	sheet.id = 'zsurf-style';
 	sheet.type = 'text/css'
-	sheet.innerHTML = 'body {overflow: hidden;} ::-webkit-scrollbar{display:none;}';
+	sheet.innerHTML = 'body {overflow: hidden !important;}' +
+		'::-webkit-scrollbar{display: none !important;}' +
+		'.blinking {' +
+		'  -webkit-animation: 1s blink step-end infinite;' +
+		'  animation: 1s blink step-end infinite;' +
+		'}' +
+		'@-webkit-keyframes "blink" {' +
+		'  from, to {' +
+		'    color: transparent;' +
+		'  }' +
+		'  50% {' +
+		'    color: white;' +
+		'  }' +
+		'}';
+
 	document.body.appendChild(sheet);
 
 	// Try to unfocus active textbox(This doesn't always work)
@@ -238,6 +304,7 @@ function createGui(){
 			shortUrl = splitUrl[0] +'//'+ splitUrl[1] + '/../' + splitUrl[splitUrl.length - 1];
 		}
 		zsurfLocation.innerHTML = shortUrl;
+		//'<span class="blinking">&nbsp;&nbsp;\u2193</span>';
 		zsurfLocation.style.cssText = [
 			'right: 0px !important;',
 			'bottom: 0px !important;',
@@ -248,6 +315,7 @@ function createGui(){
 			'font-style: normal !important;',
 			'font-size: 13px !important;',
 			'font-weight: bold !important;',
+			'text-align: right;',
 			'outline: none !important;',
 			'overflow: hidden !important;',
 			'z-index: 2147483647 !important;',
@@ -265,6 +333,14 @@ function createGui(){
 	} else {
 		return panel;
 	}
+}
+
+function simulateClick(elem){
+	var e = document.createEvent("MouseEvents");
+
+	var rect = elem.getBoundingClientRect();
+	e.initMouseEvent("click", true, true, window, 0, 0, 0, rect.left+5, rect.top+5, false, false, false, false, 0, null);
+	elem.dispatchEvent(e);
 }
 
 // Toggle passthrough mode
@@ -395,12 +471,17 @@ function judgeHintNum(hintNum) {
 
 // This will execute an appropriate action based on the type of element
 function execSelect(elem) {
+	removeHints();
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
 	if (tagName == 'a' && elem.hasAttribute('href') && elem.getAttribute('href').length > 0) {
         if (hintOpenInNewTab) {
             window.open(elem.href);
-		} else if(elem.href.indexOf('javascript:') == -1 && elem.getAttribute('href') != '#' ){
+		} else if(elem.href.indexOf('javascript:') == -1 &&
+				elem.hasAttribute('href') && 
+				elem.getAttribute('href') != '#' &&
+				elem.hasAttribute('role') && 
+				elem.getAttribute('role') != 'button'){
 			location.href = elem.href;
 		} else {
 			elem.click();
@@ -410,7 +491,6 @@ function execSelect(elem) {
     } else if (tagName == 'input' && (type == "radio" || type == "checkbox")) {
         elem.checked = !elem.checked;
     } else if (tagName == 'input' || tagName == 'textarea') {
-		console.log("focus element");
 		elem.focus();
 		elem.click();
         elem.setSelectionRange(elem.value.length, elem.value.length);
@@ -419,12 +499,12 @@ function execSelect(elem) {
     } else {
 		elem.click();
 	}
-    removeHints();
 }
 
 // Displays hints for the page
 function setHints() {
     setHintRules();
+
     var winTop = window.scrollY/zoomLevel;
     var winBottom = winTop + (window.innerHeight/zoomLevel);
     var winLeft = window.scrollX/zoomLevel;
@@ -433,12 +513,20 @@ function setHints() {
 	var elemTopList = [];
 	var offset = 0;
 
+	if(document.webkitIsFullScreen){
+		winTop = 0;
+		winLeft = 0;
+		winBottom = window.innerHeight;
+		winRight = window.innerWidth;
+		
+	}
+
 	// Query elements which can be clicked
     var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], ' +
 			'[role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], ' + 
-			'[role=button], iframe, area, textarea, select, button,[onpointerdown], ' +
+			'[role=button], [role=listbox], iframe, area, span, textarea, select, button, [onpointerdown], ' +
 			'[ondblclick], [onclick], [onfocus], [data-ui-tracking-context], ' +
-			'[data-link], [ng-click]');
+			'[data-link], [ng-click], [jsaction]');
 
 	// Add list of click elements we collected from event listeners
 	elems = clickableElems.concat(Array.from(elems));
@@ -450,7 +538,13 @@ function setHints() {
 
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
-    document.body.appendChild(div);
+
+	if(document.webkitIsFullScreen){
+		document.webkitCurrentFullScreenElement.appendChild(div);
+	} else {
+    	document.body.appendChild(div);
+	}
+
     for (var i = 0; i < elems.length; i++) {
         var elem = elems[i];
         if (!isHintDisplay(elem))
@@ -479,10 +573,16 @@ function setHints() {
 		}
 
 		// Give hint an offset if another hint is already at this position
-		var indexLeft = elemLeftList.indexOf(elemLeft);
-		var indexRight = elemTopList.indexOf(elemTop);
-		if( indexLeft != -1 && indexRight != -1 && indexLeft == indexRight ) {
-			offset += 9;
+		var elemAtPosition = false;
+		for(var j = 0; j < elemLeftList.length; j++){
+			if(elemLeft >= elemLeftList[j] - 18 && elemLeft < elemLeftList[j] + 18 &&
+				elemTop >= elemTopList[j] - 14 && elemTop < elemTopList[j] + 14) {
+				elemAtPosition = true;
+			}
+		}
+
+		if( elemAtPosition ) {
+			offset += 12;
 			elemLeft += offset;
 			elemTop += offset;
 		} else {
@@ -500,17 +600,18 @@ function setHints() {
                 'left: ', elemLeft, 'px !important;',
                 'top: ', elemTop, 'px !important;',
                 'position: absolute !important;',
-                'background-color: ' + (hintOpenInNewTab ? 'rgba(255, 128, 0, 0.65)' : 'rgba(255, 0, 0, 0.65)' ) + ' !important;',
+                'background-color: ' + (hintOpenInNewTab ? 'rgba(255, 128, 0, 0.6)' : 'rgba(255, 0, 0, 0.6)' ) + ' !important;',
 				'border: 1px solid white !important;',
 				'text-shadow: 1px 1px #000000 !important;',
                 'color: white !important;',
 				'font-family: Arial, Helvetica, sans-serif !important;',
 				'font-style: normal !important;',
-                'font-size: ' + (16 / (1 + (offset/15))).toString() +'px !important;',
+                'font-size: 14px !important;',
                 'font-weight: bold !important;',
                 'padding: 0px 1px !important;',
 				'margin: 0px !important;',
-                'z-index: 214718364' + (offset/9).toString() +' !important;',
+				'opacity: ' + (1 / (1 + (offset/24))).toString() +' !important;',
+                'z-index: 214718364' + (offset/12).toString() +' !important;',
 				'text-transform: uppercase !important;',
             ].join('');
             hint.innerHTML = num2Str(hintElems.length);
@@ -534,6 +635,7 @@ function isHintDisplay(elem){
 
 // Remove/hides hints on the page
 function removeHints(){
+
     if (!hintEnabled)
         return;
     hintEnabled = false;
@@ -545,10 +647,11 @@ function removeHints(){
     hintNumStr = '';
     var div = document.body.querySelector('div[highlight=hints]');
     if (div != undefined){
-        document.body.removeChild(div);
+		div.parentNode.removeChild(div);
     }
     document.removeEventListener('keydown', hintHandler, true);
     document.addEventListener('keydown', initKeyBind, true);
+
 }
 
 // Simple wrapper to execute desired function when specified key is pressed.
@@ -855,7 +958,7 @@ function unfocus(){
 		panel.hide();
 	}
 	if(document.activeElement != null && document.activeElement != document.body){
-			setTimeout(function(){
+		setTimeout(function(){
 			document.activeElement.blur();
 			document.body.click();
 		}, 1);
@@ -880,7 +983,15 @@ function setClipboard(text){
 function zoom(step){
 	zoomLevel = Math.min(Math.max(zoomLevel + step, 0.2), 5);
 	document.body.style.zoom = zoomLevel;
-	localStorage.setItem('zoomLevel', zoomLevel);
+
+	if(window === window.top){
+		localStorage.setItem('zoomLevel', zoomLevel);
+	}
+
+	var iframes = document.getElementsByTagName("iframe");
+	for(var i = 0; i < iframes.length; i++){
+		iframes[i].contentWindow.postMessage('zoomLevel:' + zoomLevel.toString(), '*');
+	}
 }
 
 // Set console to previous command in history
@@ -904,6 +1015,7 @@ function nextCommand(){
 	
 }
 
+// Scroll through info window
 function scrollInfoBy(offset){
 	var info = document.getElementById('zsurf-info');
 	info.scrollTop += offset;
@@ -963,7 +1075,6 @@ function initKeyBind(e){
 
 		}
 		addKeyBind( 'Escape', function(){
-
 			window.top.focus();
 			unfocus();	
 			unhighlight();
@@ -974,3 +1085,5 @@ function initKeyBind(e){
 	}
 	addKeyBind( 'Insert', function(){togglePassthrough();}, e );
 }
+
+

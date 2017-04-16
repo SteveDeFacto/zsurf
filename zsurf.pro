@@ -2,7 +2,7 @@ QMAKE_CXXFLAGS += -Ofast -flto -std=c++0x -mno-align-double
 
 QT += core
 QT += webengine
-QT += webenginewidgets
+QT += webenginewidgets 
 
 TARGET = zsurf
 TEMPLATE = app
