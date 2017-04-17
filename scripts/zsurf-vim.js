@@ -5,6 +5,7 @@
 // @author       Steven Batchelor
 // @match        *://*/*
 // @grant        GM_*
+// @run-at document-start
 // ==/UserScript==
 
 var hintNumStr = '';
@@ -28,8 +29,8 @@ var clickableElems = [];
 var focusableElems = [];
 var jsLogger = null;
 var zsurfLog = '';
-var addEventListenerNode;
-var removeEventListenerNode;
+var addEventListener_;
+var removeEventListener_;
 
 // Intercept console logging
 jsLogger = console.log;
