@@ -1,8 +1,17 @@
+// ==UserScript==
+// @name         zsurf-vim
+// @version      0.1
+// @description  Adds vim style keybindings, link hints, and a vim style console.
+// @author       Steven Batchelor
+// @match        *://*/*
+// @grant        GM_*
+// ==/UserScript==
+
 var hintNumStr = '';
 var hintElems = [];
 var hintOpenInNewTab = false;
 var hintEnabled = false;
-var hintKeys = ';asdfghjkl'
+var hintKeys = ';asdfghjkl';
 var textInputs = ['textarea','date', 'datetime-local', 'email', 'file', 'month','number', 'password', 'search', 'tel', 'text', 'url', 'week'];
 var allowFocus = [];
 var blockElems = [];
@@ -19,13 +28,15 @@ var clickableElems = [];
 var focusableElems = [];
 var jsLogger = null;
 var zsurfLog = '';
+var addEventListenerNode;
+var removeEventListenerNode;
 
 // Intercept console logging
 jsLogger = console.log;
 console.log = function(message) {
 	zsurfLog += message;
 	jsLogger.apply(console, arguments);
-}
+};
 
 // Check if a function is native or not.
 function isNative(func) {
@@ -33,38 +44,30 @@ function isNative(func) {
 }
 
 // Intercept all calls to addEventListener or removeEventListener.
-if(isNative(Node.prototype.addEventListener)){
-	addEventListenerNode = Node.prototype.addEventListener;
-}
-
-if(isNative(Node.prototype.removeEventListener)){
-	removeEventListenerNode = Node.prototype.removeEventListener;
-}
-Node.prototype.addEventListener = addEventListenerExt;
-Node.prototype.removeEventListener = removeEventListenerExt;
+addEventListener_ = HTMLElement.prototype.addEventListener;
+removeEventListener_ = HTMLElement.prototype.removeEventListener;
+HTMLElement.prototype.addEventListener = addEventListenerExt;
+HTMLElement.prototype.removeEventListener = removeEventListenerExt;
 
 // Extended addEventListener
 function addEventListenerExt(type, callback, capture) {
-	if(!isNative(callback)){
+	if(callback != parseCommand && callback != initKeyBind && callback != hintHandler && !isNative(callback)){
 
 		var eventArguments = {
 			"type" : type,
 			"callback" : callback,
 			"capture" : capture
-		};	
-		
-		if(eventListeners[this] == undefined) {
-			eventListeners[this] = [eventArguments];	
+		};
+
+		if(eventListeners[this] === undefined) {
+			eventListeners[this] = [eventArguments];
 		} else {
 			eventListeners[this].push(eventArguments);
 		}
 
-		if( (type != 'keydown' &&
+		if( type != 'keydown' &&
 			type != 'keyup' &&
-			type != 'keypress') ||
-			callback == parseCommand ||
-			callback == initKeyBind ||
-			callback == hintHandler ) {
+			type != 'keypress') {
 			if( type == 'click' ||
 				type == 'dblclick' ||
 				type == 'pointerdown' ||
@@ -80,7 +83,7 @@ function addEventListenerExt(type, callback, capture) {
 				focusableElems.push(this);
 			}
 
-			return addEventListenerNode.apply(this, arguments);
+			return addEventListener_.apply(this, arguments);
 		} else if(!allowPassthrough){
 
 			passthroughEvents.push({
@@ -90,9 +93,9 @@ function addEventListenerExt(type, callback, capture) {
 				"capture" : capture
 			});
 		}
-		
+
 	} else {
-		return addEventListenerNode.apply(this, arguments);
+		return addEventListener_.apply(this, arguments);
 	}
 }
 
@@ -100,8 +103,8 @@ function addEventListenerExt(type, callback, capture) {
 function removeEventListenerExt(type, callback, capture) {
 
 	if(!isNative(callback)){
-		if(eventListeners[this] == undefined) {
-			eventListeners[this] = [];	
+		if(eventListeners[this] === undefined) {
+			eventListeners[this] = [];
 		} else {
 			var i = eventListeners[this].indexOf(type);
 			if(i != -1) {
@@ -109,7 +112,7 @@ function removeEventListenerExt(type, callback, capture) {
 			}
 		}
 	}
-	return removeEventListenerNode.apply(this, arguments);
+	return removeEventListener_.apply(this, arguments);
 }
 
 // Log errors
@@ -119,7 +122,7 @@ window.addEventListener('error', function(event) {
 });
 
 // Listen for messages from primary window
-window.addEventListener("message", function(e){	
+window.addEventListener("message", function(e){
 	if(window !== window.top){
 		var messageData = e.data.split(':');
 		if(messageData[0] == 'zoomLevel'){
@@ -144,7 +147,7 @@ window.onwheel = function(e){
 		window.scrollBy(0, -e.wheelDelta);
 	}
 	return true;
-}
+};
 
 document.addEventListener('DOMContentLoaded', function(event) {
 
@@ -153,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
 		// Set zoom level for page
 		var storedZoomLevel = localStorage.getItem('zoomLevel');
 
-		if(!isNaN(storedZoomLevel) && storedZoomLevel != null){
+		if(!isNaN(storedZoomLevel) && storedZoomLevel !== null){
 			zoomLevel = Number(storedZoomLevel);
 			document.body.style.zoom = zoomLevel;
 		}
@@ -169,7 +172,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
 	// Remove scrollbars from the page
 	var sheet = document.createElement('style');
 	sheet.id = 'zsurf-style';
-	sheet.type = 'text/css'
+	sheet.type = 'text/css';
 	sheet.innerHTML = 'body {overflow: hidden !important;}' +
 		'::-webkit-scrollbar{display: none !important;}' +
 		'.blinking {' +
@@ -209,8 +212,8 @@ function createGui(){
 
 	var panel = document.getElementById('zsurf-panel');
 
-	if(panel == null){
-		
+	if(panel === null){
+
 		var zsurfInfo = document.createElement('textarea');
 			zsurfInfo.id = "zsurf-info";
 			zsurfInfo.style.cssText = [
@@ -231,10 +234,12 @@ function createGui(){
 				'margin: 0 !important;',
 				'padding: 0 !important;',
 			].join('');
-		zsurfInfo.show = function() {	
+
+		zsurfInfo.show = function() {
 			this.value = zsurfLog;
 			this.style.display = 'block';
-		}
+		};
+
 		zsurfInfo.hide = function() {
 			this.style.display = 'none';
 			var zsurfConsole = document.getElementById('zsurf-console');
@@ -242,7 +247,7 @@ function createGui(){
 				commandHistory.push(zsurfConsole.value);
 				commandPointer = commandHistory.length -1;
 			}
-		}
+		};
 
 		var zsurfPanel = document.createElement('div');
 			zsurfPanel.id = "zsurf-panel";
@@ -263,20 +268,22 @@ function createGui(){
 				'margin: 0 !important;',
 				'padding: 0 !important;',
 			].join('');
-		zsurfPanel.show = function(){	
+
+		zsurfPanel.show = function(){
 			this.style.display = 'block';
-		}
+		};
+
 		zsurfPanel.hide = function(){
 			this.style.display = 'none';
 			zsurfInfo.hide();
-		}
+		};
 
 		var zsurfConsole = document.createElement('input');
 		zsurfConsole.id = "zsurf-console";
 		zsurfConsole.type = "text";
 		zsurfConsole.addEventListener('keydown', parseCommand, true);
 
-		zsurfConsole.style.cssText = [ 
+		zsurfConsole.style.cssText = [
 			'left: 0px !important;',
 			'bottom: 0px !important;',
 			'width: 100% !important;',
@@ -335,36 +342,28 @@ function createGui(){
 	}
 }
 
-function simulateClick(elem){
-	var e = document.createEvent("MouseEvents");
-
-	var rect = elem.getBoundingClientRect();
-	e.initMouseEvent("click", true, true, window, 0, 0, 0, rect.left+5, rect.top+5, false, false, false, false, 0, null);
-	elem.dispatchEvent(e);
-}
-
 // Toggle passthrough mode
 function togglePassthrough(){
 	if(allowPassthrough){
 		allowPassthrough = false;
 		for(var i = 0; i < passthroughEvents.length; i++){
 			passthroughEvents[i]['element'].removeEventListener(
-				passthroughEvents[i]['type'],
-				passthroughEvents[i]['callback'],
-				passthroughEvents[i]['capture']);
+				passthroughEvents[i].type,
+				passthroughEvents[i].callback,
+				passthroughEvents[i].capture);
 		}
 		document.removeEventListener('keydown', initKeyBind, false);
-		
+
 		setTimeout(function(){
 			document.addEventListener('keydown', initKeyBind, true);
 		}, 1000);
 	} else {
 		allowPassthrough = true;
 		for(var i = 0; i < passthroughEvents.length; i++){
-			passthroughEvents[i]['element'].addEventListener(
-				passthroughEvents[i]['type'],
-				passthroughEvents[i]['callback'],
-				passthroughEvents[i]['capture']);
+			passthroughEvents[i].element.addEventListener(
+				passthroughEvents[i].type,
+				passthroughEvents[i].callback,
+				passthroughEvents[i].capture);
 		}
 		document.removeEventListener('keydown', initKeyBind, true);
 
@@ -378,7 +377,7 @@ function togglePassthrough(){
 function num2Str(num){
 	var strNum = '';
 	for (var i = 0; i < num.toString().length; i++) {
-		strNum += hintKeys.charAt(Number(num.toString().charAt(i)));	
+		strNum += hintKeys.charAt(Number(num.toString().charAt(i)));
 	}
 	return strNum;
 }
@@ -410,7 +409,7 @@ function hintMode(newtab){
 function hintHandler(e){
     var pressedKey = e.key;
     if (pressedKey == 'Enter') {
-        if (hintNumStr == '')
+        if (hintNumStr === '')
             hintNumStr = '1';
         judgeHintNum(str2Num(hintNumStr));
 
@@ -423,8 +422,8 @@ function hintHandler(e){
             judgeHintNum(hintNum);
         } else {
             var hintElem = hintElems[hintNum - 1];
-			
-            if (hintElem != undefined && hintElem.tagName.toLowerCase() == 'a') {
+
+            if (hintElem !== undefined && hintElem.tagName.toLowerCase() == 'a') {
                 setHighlight(hintElem, true);
             }
         }
@@ -438,7 +437,7 @@ function hintHandler(e){
 function setHighlight(elem, isActive) {
     if (isActive) {
         var activeElem = document.body.querySelector('a[highlight=hint_active]');
-        if (activeElem != undefined)
+        if (activeElem !== null)
             activeElem.setAttribute('highlight', 'hint_elem');
         elem.setAttribute('highlight', 'hint_active');
     } else {
@@ -454,7 +453,7 @@ function setHintRules() {
 	document.body.appendChild(sheet);
 }
 
-// This deletes hint style rules 
+// This deletes hint style rules
 function deleteHintRules() {
 	document.getElementById('zsurf-highlight').remove();
 }
@@ -462,7 +461,7 @@ function deleteHintRules() {
 // Wrapper for execSelect to prevent it from operating on an undefined hint
 function judgeHintNum(hintNum) {
     var hintElem = hintElems[hintNum - 1];
-    if (hintElem != undefined) {
+    if (hintElem !== undefined) {
         execSelect(hintElem);
     } else {
         removeHints();
@@ -478,9 +477,9 @@ function execSelect(elem) {
         if (hintOpenInNewTab) {
             window.open(elem.href);
 		} else if(elem.href.indexOf('javascript:') == -1 &&
-				elem.hasAttribute('href') && 
+				elem.hasAttribute('href') &&
 				elem.getAttribute('href') != '#' &&
-				elem.hasAttribute('role') && 
+				elem.hasAttribute('role') &&
 				elem.getAttribute('role') != 'button'){
 			location.href = elem.href;
 		} else {
@@ -518,12 +517,12 @@ function setHints() {
 		winLeft = 0;
 		winBottom = window.innerHeight;
 		winRight = window.innerWidth;
-		
+
 	}
 
 	// Query elements which can be clicked
     var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], ' +
-			'[role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], ' + 
+			'[role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], ' +
 			'[role=button], [role=listbox], iframe, area, span, textarea, select, button, [onpointerdown], ' +
 			'[ondblclick], [onclick], [onfocus], [data-ui-tracking-context], ' +
 			'[data-link], [ng-click], [jsaction]');
@@ -534,7 +533,7 @@ function setHints() {
 	// Remove duplicates
 	elems = elems.filter(function(item, pos, self) {
     	return self.indexOf(item) == pos;
-	})
+	});
 
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
@@ -555,21 +554,25 @@ function setHints() {
         var elemRight = winLeft;
 		if(elem.tagName == 'AREA'){
 
-			// Get the position of the area tag from a combination of parent img and coords attribute. 
+			// Get the position of the area tag from a combination of parent img and coords attribute.
 			var posArray = elem.coords.split(',');
 			if(posArray.length == 4){
 				var imgElem = document.body.querySelector('[usemap="#'+elem.parentNode.name+'"]');
-				elemLeft += Number(posArray[0]) + imgElem.getBoundingClientRect().left;
-				elemTop += Number(posArray[1]) + imgElem.getBoundingClientRect().top;
-				elemRight += Number(posArray[2]) + imgElem.getBoundingClientRect().left;
-				elemBottom += Number(posArray[3]) + imgElem.getBoundingClientRect().top;
+                if(imgElem != null){
+                    elemLeft += Number(posArray[0]) + imgElem.getBoundingClientRect().left;
+                    elemTop += Number(posArray[1]) + imgElem.getBoundingClientRect().top;
+                    elemRight += Number(posArray[2]) + imgElem.getBoundingClientRect().left;
+                    elemBottom += Number(posArray[3]) + imgElem.getBoundingClientRect().top;
+                }
 			}
 		} else {
         	var pos = elem.getBoundingClientRect();
-			elemTop += pos.top;
-			elemBottom += pos.bottom;
-			elemLeft += pos.left;
-			elemRight += pos.left;
+            if(pos != null){
+                elemTop += pos.top;
+                elemBottom += pos.bottom;
+                elemLeft += pos.left;
+                elemRight += pos.left;
+            }
 		}
 
 		// Give hint an offset if another hint is already at this position
@@ -596,7 +599,7 @@ function setHints() {
             hintElems.push(elem);
             setHighlight(elem, false);
             var hint = document.createElement('div');
-            hint.style.cssText = [ 
+            hint.style.cssText = [
                 'left: ', elemLeft, 'px !important;',
                 'top: ', elemTop, 'px !important;',
                 'position: absolute !important;',
@@ -629,8 +632,11 @@ function setHints() {
 
 // Checks if hint should be displayed
 function isHintDisplay(elem){
-    var pos = elem.getBoundingClientRect();
-    return elem.tagName == 'AREA' || (pos.height != 0 && pos.width != 0);
+    if(elem !== null && elem.getBoundingClientRect !== undefined){
+        var pos = elem.getBoundingClientRect();
+        return elem.tagName == 'AREA' || (pos !== null && pos.height !== 0 && pos.width !== 0);
+    }
+    return false;
 }
 
 // Remove/hides hints on the page
@@ -646,7 +652,7 @@ function removeHints(){
     hintElems = [];
     hintNumStr = '';
     var div = document.body.querySelector('div[highlight=hints]');
-    if (div != undefined){
+    if (div !== undefined){
 		div.parentNode.removeChild(div);
     }
     document.removeEventListener('keydown', hintHandler, true);
@@ -662,10 +668,10 @@ function addKeyBind( key, func, eve){
     }
 }
 
-// Opens a URL in either current tab or a new tab and makes sure there is a URL protocol 
+// Opens a URL in either current tab or a new tab and makes sure there is a URL protocol
 function openUrl(url, newTab){
 	var urlTokens = url.split("/");
-	if(newTab == false){
+	if(newTab === false){
 		if(urlTokens[0].indexOf(":") != -1){
 			window.location.href = url;
 		} else {
@@ -692,18 +698,18 @@ function findText(word, node){
 		if (node.nodeType == 3){
 			var n = node;
 			var match_pos = 0;
-			match_pos = n.nodeValue.toLowerCase().indexOf(word.toLowerCase());	
+			match_pos = n.nodeValue.toLowerCase().indexOf(word.toLowerCase());
 			if (match_pos != -1){
 				var before = n.nodeValue.substr(0, match_pos);
 				var middle = n.nodeValue.substr(match_pos, word.length);
 				var after = document.createTextNode(n.nodeValue.substr(match_pos+word.length));
 				var highlight_span = document.createElement("span");
 
-				highlight_span.style.cssText = [ 
+				highlight_span.style.cssText = [
                 'background-color: yellow !important;',
                 'z-index: 2147483647 !important;',
                 ].join('');
-				
+
 				highlight_span.appendChild(document.createTextNode(middle));
 				n.nodeValue = before;
 				n.parentNode.insertBefore(after, n.nextSibling);
@@ -746,101 +752,102 @@ function unhighlight(){
 // Takes user to next highlighted search result
 function findNext(){
 	var current_find;
-	
+
 	if (findPointer != -1)
 	{
 		current_find = highlights[findPointer];
 
-		current_find.style.cssText = [ 
+		current_find.style.cssText = [
 			'background-color: yellow !important;',
 			'z-index: 2147483647 !important;',
 		].join('');
-	}	
-	
+	}
+
 	findPointer++;
-	
+
 	if (findPointer >= highlights.length)
 			findPointer = 0;
-	
+
 	var display_find = findPointer+1;
-	
+
 	current_find = highlights[findPointer];
-	
-	current_find.style.cssText = [ 
+
+	current_find.style.cssText = [
 		'background-color: orange !important;',
 		'z-index: 2147483647 !important;',
 	].join('');
-			
+
 	scrollToPosition(highlights[findPointer]);
-	
+
 }
 
 // Takes user to previous highlighted search result
 function findPrev(){
 	var current_find;
-	
+
 	if (highlights.length < 1) return;
-	
+
 	if (findPointer != -1){
 		current_find = highlights[findPointer];
-		
-		current_find.style.cssText = [ 
+
+		current_find.style.cssText = [
 			'background-color: yellow !important;',
 			'z-index: 2147483647 !important;',
 		].join('');
-	}	
-	
+	}
+
 	findPointer--;
-	
+
 	if (findPointer < 0)
 	{
 		findPointer = highlights.length-1;
 	}
-	
+
 	var display_find = findPointer+1;
-	
+
 	current_find = highlights[findPointer];
-	
-	current_find.style.cssText = [ 
+
+	current_find.style.cssText = [
 		'background-color: orange !important;',
 		'z-index: 2147483647 !important;',
 	].join('');
-				
+
 	scrollToPosition(highlights[findPointer]);
 }
 
 // Will scroll page to specified element
-function scrollToPosition(field){ 
+function scrollToPosition(field){
 	var scrollLeft = document.body.scrollLeft || document.documentElement.scrollLeft;
 	var scrollTop = document.body.scrollTop || document.documentElement.scrollTop;
 	var scrollBottom = (window.innerHeight || document.documentElement.clientHeight || document.body.clientHeight) + scrollTop;
 	var scrollRight = (window.innerWidth || document.documentElement.clientWidth || document.body.clientWidth) + scrollLeft;
 
 	if (field){
-		var theElement = field;  
-		var elemPosX = theElement.offsetLeft;  
-		var elemPosY = theElement.offsetTop;  
-		theElement = theElement.offsetParent;  
-		while(theElement != null){  
-			elemPosX += theElement.offsetLeft   
-			elemPosY += theElement.offsetTop;  
-			theElement = theElement.offsetParent; 
-		} 
+		var theElement = field;
+		var elemPosX = theElement.offsetLeft;
+		var elemPosY = theElement.offsetTop;
+		theElement = theElement.offsetParent;
+		while(theElement != null){
+			elemPosX += theElement.offsetLeft;
+			elemPosY += theElement.offsetTop;
+			theElement = theElement.offsetParent;
+		}
 		if (elemPosX < scrollLeft || elemPosX > scrollRight ||
-			elemPosY < scrollTop || elemPosY > scrollBottom) 
+			elemPosY < scrollTop || elemPosY > scrollBottom)
 		field.scrollIntoView();
 	}
 }
 
 // Highlight text within textarea
-function textarea2pre(el){		
+function textarea2pre(el){
+    var pre;
 	if (el.nextSibling && el.nextSibling.id && el.nextSibling.id.match(/pre_/i)){
-		var pre = el.nextsibling;
+		pre = el.nextsibling;
 	} else {
-		var pre = document.createElement("pre");
+		pre = document.createElement("pre");
 	}
-	
-	var the_text = el.value; 
+
+	var the_text = el.value;
 	the_text = the_text.replace(/>/g,'&gt;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 	pre.innerHTML = the_text;
 
@@ -850,11 +857,11 @@ function textarea2pre(el){
 	el.parentNode.insertBefore(pre, el.nextSibling);
 	el.onblur = function() { this.style.display = "none"; pre.style.display = "block"; };
 	el.onchange = function() { pre.innerHTML = el.value.replace(/>/g,'&gt;').replace(/</g,'&lt;').replace(/"/g,'&quot;'); };
-	
+
 	el.style.display = "none";
 	pre.id = "pre_"+highlights.length;
-	
-	pre.onclick = function() {this.style.display = "none"; el.style.display = "block"; el.focus(); el.click()};
+
+	pre.onclick = function() {this.style.display = "none"; el.style.display = "block"; el.focus(); el.click();};
 }
 
 // Get computed style property of an element
@@ -894,8 +901,8 @@ function parseCommand(e){
 			panel.hide();
 		} else if( commandTokens[0] === ':openTab' ){
 			commandTokens.shift();
-			var url = commandTokens.join(' ');
-			openUrl(url, true);
+			var windowUrl = commandTokens.join(' ');
+			openUrl(windowUrl, true);
 			input.blur();
 			panel.hide();
 		} else if( commandTokens[0] === ':evaluate' ){
@@ -933,13 +940,13 @@ function parseCommand(e){
 
 	e.stopPropagation();
 	e.stopImmediatePropagation();
-} 
+}
 
 // Show panel and set command
 function inputText(command){
 	var panel = createGui();
 	panel.show();
-	
+
 	var console = document.getElementById('zsurf-console');
 	console.value = command;
 	console.focus();
@@ -952,7 +959,7 @@ function inputText(command){
 
 // Unfocus/hide panel
 function unfocus(){
-	removeHints()
+	removeHints();
 	var panel = document.querySelector("#zsurf-panel");
 	if(panel){
 		panel.hide();
@@ -1012,7 +1019,7 @@ function nextCommand(){
 		commandPointer = 0;
 	}
 	inputText(commandHistory[commandPointer]);
-	
+
 }
 
 // Scroll through info window
@@ -1076,7 +1083,7 @@ function initKeyBind(e){
 		}
 		addKeyBind( 'Escape', function(){
 			window.top.focus();
-			unfocus();	
+			unfocus();
 			unhighlight();
 			if(document.webkitIsFullScreen)	{
 				document.webkitCancelFullScreen();
@@ -1085,5 +1092,3 @@ function initKeyBind(e){
 	}
 	addKeyBind( 'Insert', function(){togglePassthrough();}, e );
 }
-
-
