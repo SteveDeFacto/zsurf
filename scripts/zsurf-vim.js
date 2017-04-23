@@ -28,7 +28,7 @@ var passthroughEvents = [];
 var clickableElems = [];
 var focusableElems = [];
 var jsLogger = null;
-var focusedElement = window;
+var focusedElement = null;
 var focusMode = false;
 var zsurfLog = '';
 var addEventListener_;
@@ -199,6 +199,8 @@ document.addEventListener('DOMContentLoaded', function(event) {
 		'}';
 
 	document.body.appendChild(sheet);
+
+	focusedElement = window;
 
 	// Try to unfocus active textbox(This doesn't always work)
 	unfocus();
@@ -1050,7 +1052,7 @@ function scrollInfoBy(offset){
 	info.scrollTop += offset;
 }
 
-function scrollBy(elem, offsetLeft, offsetTop){
+function scrollElementBy(elem, offsetLeft, offsetTop){
 	if(elem == window){
 		window.scrollBy(offsetLeft, offsetTop);
 	} else {
@@ -1066,7 +1068,7 @@ function scrollBy(elem, offsetLeft, offsetTop){
 	}
 }
 
-function scrollTo(elem, offsetLeft, offsetTop){
+function scrollElementTo(elem, offsetLeft, offsetTop){
 	if(elem == window){
 		window.scrollTo(document.body.scrollWidth * offsetLeft, document.body.scrollHeight * offsetTop);
 	} else {
@@ -1102,10 +1104,10 @@ function initKeyBind(e){
 				addKeyBind( 'y', function(){setClipboard(window.location);}, e );
 				addKeyBind( 'e', function(){inputText(":evaluate ");}, e );
 
-				addKeyBind( 'j', function(){scrollBy(focusedElement, 0, 50);}, e );
-				addKeyBind( 'k', function(){scrollBy(focusedElement, 0, -50);}, e );
-				addKeyBind( 'h', function(){scrollBy(focusedElement, -50, 0);}, e );
-				addKeyBind( 'l', function(){scrollBy(focusedElement, 50, 0);}, e );
+				addKeyBind( 'j', function(){scrollElementBy(focusedElement, 0, 50);}, e );
+				addKeyBind( 'k', function(){scrollElementBy(focusedElement, 0, -50);}, e );
+				addKeyBind( 'h', function(){scrollElementBy(focusedElement, -50, 0);}, e );
+				addKeyBind( 'l', function(){scrollElementBy(focusedElement, 50, 0);}, e );
 
 				addKeyBind( 'H', function(){window.history.back();}, e );
 				addKeyBind( 'L', function(){window.history.forward();}, e );
@@ -1113,8 +1115,8 @@ function initKeyBind(e){
 				addKeyBind( 'g', function(){scrollTo(focusedElement, 0, 0);}, e );
 				addKeyBind( 'G', function(){scrollTo(focusedElement, 0, 1);}, e );
 
-				addKeyBind( 'U', function(){scrollBy(focusedElement, 0, -window.innerHeight);}, e );
-				addKeyBind( 'D', function(){scrollBy(focusedElement, 0, window.innerHeight);}, e );
+				addKeyBind( 'U', function(){scrollElementBy(focusedElement, 0, -window.innerHeight);}, e );
+				addKeyBind( 'D', function(){scrollElementBy(focusedElement, 0, window.innerHeight);}, e );
 
 				addKeyBind( 'I', function(){zoom(0.1);}, e );
 				addKeyBind( 'O', function(){zoom(-0.1);}, e );
