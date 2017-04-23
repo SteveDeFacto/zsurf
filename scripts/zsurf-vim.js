@@ -4,8 +4,8 @@
 // @description  Adds vim style keybindings, link hints, and a vim style console.
 // @author       Steven Batchelor
 // @match        *://*/*
-// @grant        GM_*
-// @run-at document-start
+// @grant        window.close
+// @run-at       document-start
 // ==/UserScript==
 
 var hintNumStr = '';
@@ -28,6 +28,8 @@ var passthroughEvents = [];
 var clickableElems = [];
 var focusableElems = [];
 var jsLogger = null;
+var focusedElement = window;
+var focusMode = false;
 var zsurfLog = '';
 var addEventListener_;
 var removeEventListener_;
@@ -42,6 +44,13 @@ console.log = function(message) {
 // Check if a function is native or not.
 function isNative(func) {
   return !('prototype' in func);
+}
+
+function isArray(obj) {
+	if (obj != undefined && obj.constructor.toString().indexOf('Array') != -1) {
+		return true;
+	}
+	return false;
 }
 
 // Intercept all calls to addEventListener or removeEventListener.
@@ -393,12 +402,14 @@ function str2Num(str){
 }
 
 // Display wrapper for setHints
-function hintMode(newtab){
+function hintMode(type){
     hintEnabled = true;
-    if (newtab) {
-        hintOpenInNewTab = true;
-    } else {
+    if (type == 0) {
         hintOpenInNewTab = false;
+    } else if(type == 1){
+        hintOpenInNewTab = true;
+    } else if(type == 2){
+		focusMode = true;
     }
     setHints();
     document.removeEventListener('keydown', initKeyBind, true);
@@ -463,15 +474,26 @@ function deleteHintRules() {
 function judgeHintNum(hintNum) {
     var hintElem = hintElems[hintNum - 1];
     if (hintElem !== undefined) {
-        execSelect(hintElem);
-    } else {
+		if(focusMode){
+			focusedElement = hintElem;	
+			removeHints();
+		} else {
+			removeHints();
+			if(!isArray(hintElem)){
+				execSelect(hintElem);
+			} else {
+				for(var i = hintElem.length-1; i >= 0; i--){
+					execSelect(hintElem[i]);
+				}
+			}
+		}
+	} else {
         removeHints();
     }
 }
 
 // This will execute an appropriate action based on the type of element
 function execSelect(elem) {
-	removeHints();
     var tagName = elem.tagName.toLowerCase();
     var type = elem.type ? elem.type.toLowerCase() : "";
 	if (tagName == 'a' && elem.hasAttribute('href') && elem.getAttribute('href').length > 0) {
@@ -511,19 +533,18 @@ function setHints() {
     var winRight = winLeft + (window.innerWidth/zoomLevel);
 	var elemLeftList = [];
 	var elemTopList = [];
-	var offset = 0;
 
+	// Ignore scroll offset in full screen mode
 	if(document.webkitIsFullScreen){
 		winTop = 0;
 		winLeft = 0;
 		winBottom = window.innerHeight;
 		winRight = window.innerWidth;
-
 	}
 
 	// Query elements which can be clicked
-    var elems = document.body.querySelectorAll('a, input:not([type=hidden]), [data=events], ' +
-			'[role=tab], [role=radio] , [role=option], [role=combobox], [role=checkbox], ' +
+    var elems = document.body.querySelectorAll('a, article, nav, input:not([type=hidden]), [data=events], ' +
+			'[role=tab], [role=radio], [role=option], [role=combobox], [role=checkbox], ' +
 			'[role=button], [role=listbox], iframe, area, span, textarea, select, button, [onpointerdown], ' +
 			'[ondblclick], [onclick], [onfocus], [data-ui-tracking-context], ' +
 			'[data-link], [ng-click], [jsaction]');
@@ -539,6 +560,7 @@ function setHints() {
     var div = document.createElement('div');
     div.setAttribute('highlight', 'hints');
 
+	// Add hints to full screen element for full screen mode
 	if(document.webkitIsFullScreen){
 		document.webkitCurrentFullScreenElement.appendChild(div);
 	} else {
@@ -567,6 +589,8 @@ function setHints() {
                 }
 			}
 		} else {
+
+			// Can just get client rect for standard elements
         	var pos = elem.getBoundingClientRect();
             if(pos != null){
                 elemTop += pos.top;
@@ -577,56 +601,55 @@ function setHints() {
 		}
 
 		// Give hint an offset if another hint is already at this position
-		var elemAtPosition = false;
+		var elemAtPosition = -1;
 		for(var j = 0; j < elemLeftList.length; j++){
 			if(elemLeft >= elemLeftList[j] - 18 && elemLeft < elemLeftList[j] + 18 &&
 				elemTop >= elemTopList[j] - 14 && elemTop < elemTopList[j] + 14) {
-				elemAtPosition = true;
+				elemAtPosition = j;
 			}
-		}
-
-		if( elemAtPosition ) {
-			offset += 12;
-			elemLeft += offset;
-			elemTop += offset;
-		} else {
-			elemLeftList.push(elemLeft);
-			elemTopList.push(elemTop);
-			offset = 0;
 		}
 
 		// Add hint to page
         if ( elemBottom >= winTop && elemTop <= winBottom) {
-            hintElems.push(elem);
-            setHighlight(elem, false);
-            var hint = document.createElement('div');
-            hint.style.cssText = [
-                'left: ', elemLeft, 'px !important;',
-                'top: ', elemTop, 'px !important;',
-                'position: absolute !important;',
-                'background-color: ' + (hintOpenInNewTab ? 'rgba(255, 128, 0, 0.6)' : 'rgba(255, 0, 0, 0.6)' ) + ' !important;',
-				'border: 1px solid white !important;',
-				'text-shadow: 1px 1px #000000 !important;',
-                'color: white !important;',
-				'font-family: Arial, Helvetica, sans-serif !important;',
-				'font-style: normal !important;',
-                'font-size: 14px !important;',
-                'font-weight: bold !important;',
-                'padding: 0px 1px !important;',
-				'margin: 0px !important;',
-				'opacity: ' + (1 / (1 + (offset/24))).toString() +' !important;',
-                'z-index: 214718364' + (offset/12).toString() +' !important;',
-				'text-transform: uppercase !important;',
-            ].join('');
-            hint.innerHTML = num2Str(hintElems.length);
-            div.appendChild(hint);
-            if (elem.tagName.toLowerCase() == 'a') {
-                if (hintElems.length == 1) {
-                    setHighlight(elem, true);
-                } else {
-                    setHighlight(elem, false);
-                }
-            }
+			if(elemAtPosition == -1){
+				elemLeftList.push(elemLeft);
+				elemTopList.push(elemTop);
+				hintElems.push(elem);
+				setHighlight(elem, false);
+				var hint = document.createElement('div');
+				hint.style.cssText = [
+					'left: ', elemLeft, 'px !important;',
+					'top: ', elemTop, 'px !important;',
+					'position: absolute !important;',
+					'background-color: ' + (focusMode ? 'rgba(0, 128, 255, 0.6)' : (hintOpenInNewTab ? 'rgba(255, 128, 0, 0.6)' : 'rgba(255, 0, 0, 0.6)' )) + ' !important;',
+					'border: 1px solid white !important;',
+					'text-shadow: 1px 1px #000000 !important;',
+					'color: white !important;',
+					'font-family: Arial, Helvetica, sans-serif !important;',
+					'font-style: normal !important;',
+					'font-size: 14px !important;',
+					'font-weight: bold !important;',
+					'padding: 0px 1px !important;',
+					'margin: 0px !important;',
+					'z-index: 2147183647 !important;',
+					'text-transform: uppercase !important;',
+				].join('');
+				hint.innerHTML = num2Str(hintElems.length);
+				div.appendChild(hint);
+				if (elem.tagName.toLowerCase() == 'a') {
+					if (hintElems.length == 1) {
+						setHighlight(elem, true);
+					} else {
+						setHighlight(elem, false);
+					}
+				}
+			} else {
+				if(!isArray( hintElems[elemAtPosition])){
+					hintElems[elemAtPosition] = [hintElems[elemAtPosition], elem];
+				} else {
+					hintElems[elemAtPosition].push(elem);
+				}
+			}
         }
     }
 }
@@ -647,9 +670,7 @@ function removeHints(){
         return;
     hintEnabled = false;
     deleteHintRules();
-    for (var i = 0; i < hintElems.length; i++){
-        hintElems[i].removeAttribute('highlight');
-    }
+	focusMode = false;
     hintElems = [];
     hintNumStr = '';
     var div = document.body.querySelector('div[highlight=hints]');
@@ -1029,6 +1050,38 @@ function scrollInfoBy(offset){
 	info.scrollTop += offset;
 }
 
+function scrollBy(elem, offsetLeft, offsetTop){
+	if(elem == window){
+		window.scrollBy(offsetLeft, offsetTop);
+	} else {
+		if(!isArray(elem)){
+			elem.scrollLeft += offsetLeft;
+			elem.scrollTop += offsetTop;
+		} else {
+			for(var i = 0; i < focusedElement.length; i++){
+				elem[i].scrollLeft += offsetLeft;
+				elem[i].scrollTop += offsetTop;
+			}
+		}
+	}
+}
+
+function scrollTo(elem, offsetLeft, offsetTop){
+	if(elem == window){
+		window.scrollTo(document.body.scrollWidth * offsetLeft, document.body.scrollHeight * offsetTop);
+	} else {
+		if(!isArray(elem)){
+			elem.scrollLeft = elem.scrollWidth * offsetLeft;
+			elem.scrollTop = elem.scrollHeight * offsetTop;
+		} else {
+			for(var i = 0; i < focusedElement.length; i++){
+				elem[i].scrollLeft = elem[i].scrollWidth * offsetLeft;
+				elem[i].scrollTop = elem[i].scrollHeight * offsetTop;
+			}
+		}
+	}
+}
+
 // Bind keys
 function initKeyBind(e){
 	if(!allowPassthrough){
@@ -1037,8 +1090,10 @@ function initKeyBind(e){
 			if( document.activeElement == null ||
 				(textInputs.indexOf(document.activeElement.type) == -1 &&
 				document.activeElement.contentEditable != "true") ){
-				addKeyBind( 'f', function(){hintMode();}, e );
-				addKeyBind( 'F', function(){hintMode(true);}, e );
+
+				addKeyBind( 'f', function(){hintMode(0);}, e );
+				addKeyBind( 'F', function(){hintMode(1);}, e );
+				addKeyBind( ';', function(){hintMode(2);}, e );
 				addKeyBind( 'o', function(){inputText(":open ");}, e );
 				addKeyBind( 't', function(){inputText(":openTab ");}, e );
 				addKeyBind( 'r', function(){window.location.reload(false);}, e );
@@ -1047,19 +1102,19 @@ function initKeyBind(e){
 				addKeyBind( 'y', function(){setClipboard(window.location);}, e );
 				addKeyBind( 'e', function(){inputText(":evaluate ");}, e );
 
-				addKeyBind( 'j', function(){window.scrollBy(0,50);}, e );
-				addKeyBind( 'k', function(){window.scrollBy(0,-50);}, e );
-				addKeyBind( 'h', function(){window.scrollBy(-50,0);}, e );
-				addKeyBind( 'l', function(){window.scrollBy(50,0);}, e );
+				addKeyBind( 'j', function(){scrollBy(focusedElement, 0, 50);}, e );
+				addKeyBind( 'k', function(){scrollBy(focusedElement, 0, -50);}, e );
+				addKeyBind( 'h', function(){scrollBy(focusedElement, -50, 0);}, e );
+				addKeyBind( 'l', function(){scrollBy(focusedElement, 50, 0);}, e );
 
 				addKeyBind( 'H', function(){window.history.back();}, e );
 				addKeyBind( 'L', function(){window.history.forward();}, e );
 
-				addKeyBind( 'g', function(){window.scrollTo(0,0);}, e );
-				addKeyBind( 'G', function(){window.scrollTo(0,document.body.scrollHeight);}, e );
+				addKeyBind( 'g', function(){scrollTo(focusedElement, 0, 0);}, e );
+				addKeyBind( 'G', function(){scrollTo(focusedElement, 0, 1);}, e );
 
-				addKeyBind( 'U', function(){window.scrollBy(0,-window.innerHeight);}, e );
-				addKeyBind( 'D', function(){window.scrollBy(0,window.innerHeight);}, e );
+				addKeyBind( 'U', function(){scrollBy(focusedElement, 0, -window.innerHeight);}, e );
+				addKeyBind( 'D', function(){scrollBy(focusedElement, 0, window.innerHeight);}, e );
 
 				addKeyBind( 'I', function(){zoom(0.1);}, e );
 				addKeyBind( 'O', function(){zoom(-0.1);}, e );
@@ -1084,6 +1139,7 @@ function initKeyBind(e){
 		}
 		addKeyBind( 'Escape', function(){
 			window.top.focus();
+			focusedElement = window;
 			unfocus();
 			unhighlight();
 			if(document.webkitIsFullScreen)	{
