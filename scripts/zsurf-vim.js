@@ -5,6 +5,7 @@
 // @author       Steven Batchelor
 // @match        *://*/*
 // @grant        window.close
+// @grant        GM_*
 // @run-at       document-start
 // ==/UserScript==
 
@@ -47,7 +48,7 @@ function isNative(func) {
 }
 
 function isArray(obj) {
-	if (obj != undefined && obj.constructor.toString().indexOf('Array') != -1) {
+	if (obj !== undefined && obj.constructor.toString().indexOf('Array') !== -1) {
 		return true;
 	}
 	return false;
@@ -133,7 +134,7 @@ window.addEventListener('error', function(event) {
 
 // Listen for messages from primary window
 window.addEventListener("message", function(e){
-	if(window !== window.top){
+	if(window !== window.top && e.data !== undefined){
 		var messageData = e.data.split(':');
 		if(messageData[0] == 'zoomLevel'){
 			zoomLevel = Number(messageData[1]);
@@ -198,7 +199,7 @@ document.addEventListener('DOMContentLoaded', function(event) {
 		'  }' +
 		'}';
 
-	document.body.appendChild(sheet);
+	//document.body.appendChild(sheet);
 
 	focusedElement = window;
 
@@ -359,7 +360,7 @@ function togglePassthrough(){
 	if(allowPassthrough){
 		allowPassthrough = false;
 		for(var i = 0; i < passthroughEvents.length; i++){
-			passthroughEvents[i]['element'].removeEventListener(
+			passthroughEvents[i].element.removeEventListener(
 				passthroughEvents[i].type,
 				passthroughEvents[i].callback,
 				passthroughEvents[i].capture);
@@ -406,11 +407,11 @@ function str2Num(str){
 // Display wrapper for setHints
 function hintMode(type){
     hintEnabled = true;
-    if (type == 0) {
+    if (type === 0) {
         hintOpenInNewTab = false;
-    } else if(type == 1){
+    } else if(type === 1){
         hintOpenInNewTab = true;
-    } else if(type == 2){
+    } else if(type === 2){
 		focusMode = true;
     }
     setHints();
@@ -437,7 +438,7 @@ function hintHandler(e){
         } else {
             var hintElem = hintElems[hintNum - 1];
 
-            if (hintElem !== undefined && hintElem.tagName.toLowerCase() == 'a') {
+            if (hintElem !== undefined && hintElem.tagName == 'a') {
                 setHighlight(hintElem, true);
             }
         }
@@ -477,7 +478,7 @@ function judgeHintNum(hintNum) {
     var hintElem = hintElems[hintNum - 1];
     if (hintElem !== undefined) {
 		if(focusMode){
-			focusedElement = hintElem;	
+			focusedElement = hintElem;
 			removeHints();
 		} else {
 			removeHints();
@@ -496,8 +497,9 @@ function judgeHintNum(hintNum) {
 
 // This will execute an appropriate action based on the type of element
 function execSelect(elem) {
-    var tagName = elem.tagName.toLowerCase();
-    var type = elem.type ? elem.type.toLowerCase() : "";
+    var tagName = elem.tagName;
+	var type = elem.type ? elem.type.toLowerCase() : "";
+
 	if (tagName == 'a' && elem.hasAttribute('href') && elem.getAttribute('href').length > 0) {
         if (hintOpenInNewTab) {
             window.open(elem.href);
@@ -545,7 +547,7 @@ function setHints() {
 	}
 
 	// Query elements which can be clicked
-    var elems = document.body.querySelectorAll('a, article, nav, input:not([type=hidden]), [data=events], ' +
+    var elems = document.body.querySelectorAll('a, svg, article, nav, input:not([type=hidden]), [data=events], ' +
 			'[role=tab], [role=radio], [role=option], [role=combobox], [role=checkbox], ' +
 			'[role=button], [role=listbox], iframe, area, span, textarea, select, button, [onpointerdown], ' +
 			'[ondblclick], [onclick], [onfocus], [data-ui-tracking-context], ' +
@@ -583,7 +585,7 @@ function setHints() {
 			var posArray = elem.coords.split(',');
 			if(posArray.length == 4){
 				var imgElem = document.body.querySelector('[usemap="#'+elem.parentNode.name+'"]');
-                if(imgElem != null){
+                if(imgElem !== null){
                     elemLeft += Number(posArray[0]) + imgElem.getBoundingClientRect().left;
                     elemTop += Number(posArray[1]) + imgElem.getBoundingClientRect().top;
                     elemRight += Number(posArray[2]) + imgElem.getBoundingClientRect().left;
@@ -594,7 +596,7 @@ function setHints() {
 
 			// Can just get client rect for standard elements
         	var pos = elem.getBoundingClientRect();
-            if(pos != null){
+            if(pos !== null){
                 elemTop += pos.top;
                 elemBottom += pos.bottom;
                 elemLeft += pos.left;
@@ -605,8 +607,8 @@ function setHints() {
 		// Give hint an offset if another hint is already at this position
 		var elemAtPosition = -1;
 		for(var j = 0; j < elemLeftList.length; j++){
-			if(elemLeft >= elemLeftList[j] - 18 && elemLeft < elemLeftList[j] + 18 &&
-				elemTop >= elemTopList[j] - 14 && elemTop < elemTopList[j] + 14) {
+			if(elemLeft >= elemLeftList[j] - 9 && elemLeft < elemLeftList[j] + 9 &&
+				elemTop >= elemTopList[j] - 7 && elemTop < elemTopList[j] + 7) {
 				elemAtPosition = j;
 			}
 		}
@@ -638,7 +640,7 @@ function setHints() {
 				].join('');
 				hint.innerHTML = num2Str(hintElems.length);
 				div.appendChild(hint);
-				if (elem.tagName.toLowerCase() == 'a') {
+				if (elem.tagName/*.toLowerCase()*/ == 'a') {
 					if (hintElems.length == 1) {
 						setHighlight(elem, true);
 					} else {
@@ -851,7 +853,7 @@ function scrollToPosition(field){
 		var elemPosX = theElement.offsetLeft;
 		var elemPosY = theElement.offsetTop;
 		theElement = theElement.offsetParent;
-		while(theElement != null){
+		while(theElement !== null){
 			elemPosX += theElement.offsetLeft;
 			elemPosY += theElement.offsetTop;
 			theElement = theElement.offsetParent;
@@ -904,38 +906,77 @@ function parseCommand(e){
 		var input = document.getElementById('zsurf-console');
 		var info = document.getElementById('zsurf-info');
 
+
 		if(input.value.split(' ').length > 1){
 			commandHistory.push(input.value);
 			commandPointer = commandHistory.length -1;
 		}
+		var parameters = input.value.split(' ');
 
-		var commandTokens = input.value.split(' ');
+		var command = parameters.shift();
 
-		if( commandTokens[0] === ':open' ){
-			commandTokens.shift();
-			var url = commandTokens.join(' ');
-			openUrl(url, false);
+		if( command === ':open' ){
+			var url = parameters[0];
+			if(typeof GM_listValues === 'function'){
+				var bookmarks = GM_listValues();
+				var bmIndex = bookmarks.indexOf(url);
+				if(bmIndex != -1){
+					var bookmark = GM_getValue(bookmarks[bmIndex]);
+					openUrl(bookmark, false);
+				} else {
+					openUrl(url, false);
+				}
+			} else {
+				openUrl(url, false);
+			}
 			input.blur();
 			panel.hide();
-		} else if( commandTokens[0] === ':search' ){
-			commandTokens.shift();
-			var search = commandTokens.join(' ');
+		} else if( command === ':openTab' ){
+			var windowUrl = parameters[0];
+			if(typeof GM_listValues === 'function'){
+				var bookmarks = GM_listValues();
+				var bmIndex = bookmarks.indexOf(windowUrl);
+				if(bmIndex != -1){
+					var bookmark = GM_getValue(bookmarks[bmIndex]);
+					openUrl(bookmark, true);
+				} else {
+					openUrl(windowUrl, true);
+				}
+			} else {
+				openUrl(windowUrl, true);
+			}
+			input.blur();
+			panel.hide();
+		} else if( command === ':search' ){
+			var search = parameters.join(' ');
 			findText(search);
 			input.blur();
 			panel.hide();
-		} else if( commandTokens[0] === ':openTab' ){
-			commandTokens.shift();
-			var windowUrl = commandTokens.join(' ');
-			openUrl(windowUrl, true);
-			input.blur();
-			panel.hide();
-		} else if( commandTokens[0] === ':evaluate' ){
-			commandTokens.shift();
-			var js = commandTokens.join(' ');
+		} else if( command === ':evaluate' ){
+			var js = parameters.join(' ');
 			zsurfLog += eval(js) + '\n';
+			//	window.eval.call(window,'(function (elem) {'+js+'})')(focusedElement) + '\n';
 			info.scrollTop = info.scrollHeight;
 			info.show();
-		} else if( commandTokens[0] === ':q' ){
+		} else if( command === ':bmark' ){
+			if(typeof GM_setValue === 'function') {
+				var bmark = parameters[0];
+				GM_setValue(bmark, window.location.href);
+			} else {
+				console.log("Browser doesn't appear to support this function.");
+			}
+			input.blur();
+			panel.hide();
+		} else if( command === ':delbmark' ){
+			if(typeof GM_setValue === 'function') {
+				var bmark = parameters[0];
+				GM_deleteValue(bmark);
+			} else {
+				console.log("Browser doesn't appear to support this function.");
+			}
+			input.blur();
+			panel.hide();
+		} else if( command === ':q' ){
 			window.close();
 			input.blur();
 			panel.hide();
@@ -945,12 +986,12 @@ function parseCommand(e){
 
 		var input = document.getElementById('zsurf-console');
 
-		var commandTokens = input.value.split(' ');
+		var parameters = input.value.split(' ');
 
-		if( commandTokens[0] === ':evaluate' ){
-			commandTokens.shift();
-			var js = commandTokens.join(' ');
+		var command = parameters.shift();
 
+		if( command === ':evaluate' ){
+			var js = parameters.join(' ');
 			var complete = js.substring(js.lastIndexOf('.')+1, js.length);
 			var searchStr = js.substring(0, js.lastIndexOf('.'));
 			var searchElem = eval(searchStr.length > 0 ? searchStr : 'window' );
@@ -958,6 +999,29 @@ function parseCommand(e){
 
 			if(propertyNames[0] != undefined){
 				input.value = ':evaluate ' + searchStr + (searchStr.length > 0 ? '.' : '') + propertyNames[0];
+			}
+		} else if(typeof  GM_listValues === "function" && (command === ':open' || command === ':openTab' || command === ':bmark'  || command === ':delbmark')){
+			var url = parameters[0];
+			if(url.length > 0){
+				var bookmarks = GM_listValues().sort();
+				for(var i = 0; i < bookmarks.length; i++){
+					if(bookmarks[i].startsWith(url)){
+						input.value = [command, bookmarks[i]].join(' ');
+						break;
+					}
+				}
+			}
+		}
+	} else if(e.keyCode == 8) {
+
+		var input = document.getElementById('zsurf-console');
+		if(input.value.length == 1){
+			window.top.focus();
+			focusedElement = window;
+			unfocus();
+			unhighlight();
+			if(document.webkitIsFullScreen)	{
+				document.webkitCancelFullScreen();
 			}
 		}
 	}
@@ -988,7 +1052,7 @@ function unfocus(){
 	if(panel){
 		panel.hide();
 	}
-	if(document.activeElement != null && document.activeElement != document.body){
+	if(document.activeElement !== null && document.activeElement != document.body){
 		setTimeout(function(){
 			document.activeElement.blur();
 			document.body.click();
@@ -1089,7 +1153,7 @@ function initKeyBind(e){
 	if(!allowPassthrough){
 		var t = e.target;
 		if( t.nodeType == 1){
-			if( document.activeElement == null ||
+			if( document.activeElement === null ||
 				(textInputs.indexOf(document.activeElement.type) == -1 &&
 				document.activeElement.contentEditable != "true") ){
 
@@ -1112,8 +1176,8 @@ function initKeyBind(e){
 				addKeyBind( 'H', function(){window.history.back();}, e );
 				addKeyBind( 'L', function(){window.history.forward();}, e );
 
-				addKeyBind( 'g', function(){scrollTo(focusedElement, 0, 0);}, e );
-				addKeyBind( 'G', function(){scrollTo(focusedElement, 0, 1);}, e );
+				addKeyBind( 'g', function(){scrollElementTo(focusedElement, 0, 0);}, e );
+				addKeyBind( 'G', function(){scrollElementTo(focusedElement, 0, 1);}, e );
 
 				addKeyBind( 'U', function(){scrollElementBy(focusedElement, 0, -window.innerHeight);}, e );
 				addKeyBind( 'D', function(){scrollElementBy(focusedElement, 0, window.innerHeight);}, e );

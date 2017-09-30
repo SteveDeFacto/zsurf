@@ -2,7 +2,8 @@ QMAKE_CXXFLAGS += -Ofast -flto -std=c++0x -mno-align-double
 
 QT += core
 QT += webengine
-QT += webenginewidgets 
+QT += webenginewidgets
+QT += webchannel
 
 TARGET = zsurf
 TEMPLATE = app
@@ -37,3 +38,9 @@ SOURCES = zsurf.cpp
     INSTALLS += dictionaries
 
 }
+
+RESOURCES += \
+    zsurf.qrc
+
+HEADERS += \
+    zsurf.h

@@ -1,38 +1,9 @@
-#include <QApplication>
-#include <QShortcut>
-#include <QWidget>
-#include <QDataStream>
-#include <QFileSystemWatcher>
-#include <QNetworkProxy>
-#include <QNetworkConfiguration>
-#include <QMessageBox>
-#include <QSettings>
-#include <QFileDialog>
-#include <QWindow>
-#include <QMainWindow>
-#include <QLayout>
-#include <QTimer>
-#include <QList>
-#include <QFileInfo>
-#include <QFile>
-#include <QDir>
-#include <QWebEngineView>
-#include <QWebEnginePage>
-#include <QWebEngineProfile>
-#include <QWebEngineSettings>
-#include <QWebEngineHistory>
-#include <QWebEngineScript>
-#include <QWebEngineFullScreenRequest>
-#include <QWebEngineScriptCollection>
-#include <QWebEngineUrlRequestInterceptor>
-#include <QWebEngineUrlRequestInfo>
+#include "zsurf.h"
 
-class ZWebEngineView;
-class ZWebEngineUrlRequestInterceptor;
-
-QApplication* application;
-QFileSystemWatcher* watcher;
-ZWebEngineUrlRequestInterceptor* requestInterceptor;
+ZBrowser *browser;
+QApplication *application;
+QFileSystemWatcher *watcher;
+ZWebEngineUrlRequestInterceptor *requestInterceptor;
 QList<ZWebEngineView*> webEngineViews;
 QList<QString> requireList;
 QList<QWebEngineScript> scriptList;
@@ -50,8 +21,10 @@ bool cacheEnabled;
 bool saveCookies;
 bool allowPopups;
 bool spellCheck;
-/*
+
+
 // Content filtering
+/*
 class ZWebEngineUrlRequestInterceptor : public QWebEngineUrlRequestInterceptor {
 
 public:
@@ -61,7 +34,7 @@ public:
     }
 
     void interceptRequest(QWebEngineUrlRequestInfo &info){
-        info.block(true);
+        //info.block(true);
     }
 };
 */
@@ -70,19 +43,20 @@ public:
 class ZWebEngineView : public QWebEngineView {
 
 public :
+
     Qt::WindowStates prevWindowState;
 
-    ZWebEngineView(QString url, bool visible)
+    ZWebEngineView(QString url, QWebEngineProfile *profile, bool visible)
     {
+        if(profile != NULL)
+        {
+            setPage(new QWebEnginePage(profile, this));
+        }
+
         // Add scripts to page
         for(int i = 0; i < scriptList.length(); i++) {
             page()->scripts().insert(scriptList[i]);
         }
-
-        // Add url request interceptor to page profile
-        //requestInterceptor = new ZWebEngineUrlRequestInterceptor();
-        //page()->profile()->setRequestInterceptor(requestInterceptor);
-
         // Configure user agent
         page()->profile()->setHttpUserAgent(userAgent);
 
@@ -203,7 +177,7 @@ public :
         webEngineViews.push_back(this);
     }
 
-    ZWebEngineView() : ZWebEngineView("", true) {}
+    ZWebEngineView() : ZWebEngineView("", NULL, true) {}
 
     ZWebEngineView* createWindow(QWebEnginePage::WebWindowType type)
     {
@@ -220,6 +194,99 @@ public :
         }
     }
 };
+
+ZTab::ZTab()
+{
+    this->zoomFactor = 1.0f;
+}
+
+ZTab::~ZTab(){
+
+}
+
+float ZTab::getZoomFactor() const
+{
+    return this->zoomFactor;
+}
+
+void ZTab::setZoomFactor(float zoomFactor)
+{
+    this->zoomFactor = zoomFactor;
+    emit zoomFactorChanged();
+}
+
+ZTabs::ZTabs()
+{
+    current = 0;
+    tabsList.push_back(new ZTab());
+}
+/*
+Promise ZTabs::setZoom(int tabId, float zoomFactor)
+{
+    tabsList[tabId]->setZoomFactor(zoomFactor);
+}
+
+Promise ZTabs::getZoom(float& zoomFactor)
+{
+    zoomFactor = tabsList[current]->getZoomFactor();
+}
+*/
+int ZTabs::getCurrent()
+{
+    return current;
+}
+ZBrowser::ZBrowser()
+{
+
+    tabs = new ZTabs();
+
+    profile = new QWebEngineProfile("Default");
+
+/*
+    QFile webChannelJsFile(":/qtwebchannel/qwebchannel.js");
+    if( !webChannelJsFile.open(QIODevice::ReadOnly) )
+    {
+        qDebug() << QString("Couldn't open qwebchannel.js file: %1").arg(webChannelJsFile.errorString());
+    }
+    else
+    {
+        QByteArray webChannelJs = webChannelJsFile.readAll();
+        webChannelJs.append(
+            "\n"
+            "var browser"
+            "\n"
+            "new QWebChannel(qt.webChannelTransport, function(channel) {"
+            "     browser = channel.objects.browser;"
+            "});"
+        );
+
+        QWebEngineScript script;
+        script.setSourceCode(webChannelJs);
+        script.setName("qwebchannel.js");
+        script.setWorldId(QWebEngineScript::MainWorld);
+        script.setInjectionPoint(QWebEngineScript::DocumentCreation);
+        script.setRunsOnSubFrames(false);
+        profile->scripts()->insert(script);
+
+        qDebug() << "Loaded WebExtensions API!";
+    }
+
+    // Add url request interceptor to page profile
+    requestInterceptor = new ZWebEngineUrlRequestInterceptor();
+    profile->setRequestInterceptor(requestInterceptor);
+*/
+
+    webEngineView = new ZWebEngineView(homePage, profile, true);
+
+    ZTab* test = new ZTab();
+/*
+    // Set web channel for page
+    QWebChannel *channel = new QWebChannel();
+    webEngineView->page()->setWebChannel(channel);
+    channel->registerObject(QStringLiteral("browser"), (QObject*)test);
+
+*/
+}
 
 // Load javascripts.
 void loadScripts()
@@ -458,7 +525,7 @@ int main(int argc, char* argv[])
     liveReload();
 
     // Open primary web view.
-    new ZWebEngineView(homePage, true);
+    browser = new ZBrowser();
 
     // Return exit status.
     return application->exec();
