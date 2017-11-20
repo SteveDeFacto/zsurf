@@ -1,4 +1,4 @@
-QMAKE_CXXFLAGS += -Ofast -flto -std=c++0x -mno-align-double
+QMAKE_CXXFLAGS += -Ofast -flto -std=c++0x
 
 QT += core
 QT += webkit
