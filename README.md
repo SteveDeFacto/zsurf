@@ -1,7 +1,6 @@
 zsurf - Simple QtWebEngine browser. 
 
-No AdBlock:
-Future versions will offer a built-in AdBlocker. I recommend using Privoxy with EasyList for the time being.
+For AdBlock I recommend using Privoxy with EasyList.
 
 Build/Install Instructions:
 
